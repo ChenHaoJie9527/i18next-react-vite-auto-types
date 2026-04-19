@@ -9,10 +9,10 @@ importers:
   .:
     dependencies:
       i18next:
-        specifier: ^26.0.6
+        specifier: ^23 || ^24 || ^25 || ^26
         version: 26.0.6(typescript@6.0.3)
       react-i18next:
-        specifier: ^17.0.4
+        specifier: ^14 || ^15 || ^16 || ^17
         version: 17.0.4(i18next@26.0.6(typescript@6.0.3))(react@19.2.5)(typescript@6.0.3)
     devDependencies:
       '@biomejs/biome':

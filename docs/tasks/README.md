@@ -33,34 +33,38 @@
 
 ## 1. 决策清单（已锁定）
 
-| 维度 | 决策 |
-|---|---|
-| 包名 | `i18next-kit` |
-| CLI bin | `i18next-kit` |
-| 插件默认导出 | `i18nextKit()` |
-| 契约层 | `base/` 保留，两种模式都受其约束 |
-| 实现层模式 | `folder`（P1 实现）、`file`（P3 实现，named export） |
-| 懒加载 | 支持，依赖 `i18next-resources-to-backend`（peer optional） |
-| 生成产物 | `generated-resources.ts` / `contracts.ts` / `generated-runtime.ts` / `i18next.d.ts` |
-| 生成产物默认位置 | `src/i18n/`（可 config 覆盖） |
-| 生成文件是否入 git | 入 git，文件头加 `/* AUTO-GENERATED — DO NOT EDIT */` |
-| `contracts.ts` | 完全生成式 |
-| 运行时入口导出 | 函数 `initI18n(options?)` |
-| 错误策略 | dev 不阻塞（overlay + console.warn）；build 阻塞；CLI 阻塞 |
-| 命名映射 | folder 模式按 `base/` 文件名；file 模式自动 `kebab ↔ camelCase`，可 `nameTransform` 关 |
-| JS 项目 | 可用但无类型提示，不单独适配 |
-| 交互式 CLI 依赖 | `@clack/prompts` |
+
+| 维度             | 决策                                                                                  |
+| -------------- | ----------------------------------------------------------------------------------- |
+| 包名             | `i18next-kit`                                                                       |
+| CLI bin        | `i18next-kit`                                                                       |
+| 插件默认导出         | `i18nextKit()`                                                                      |
+| 契约层            | `base/` 保留，两种模式都受其约束                                                                |
+| 实现层模式          | `folder`（P1 实现）、`file`（P3 实现，named export）                                          |
+| 懒加载            | 支持，依赖 `i18next-resources-to-backend`（peer optional）                                 |
+| 生成产物           | `generated-resources.ts` / `contracts.ts` / `generated-runtime.ts` / `i18next.d.ts` |
+| 生成产物默认位置       | `src/i18n/`（可 config 覆盖）                                                            |
+| 生成文件是否入 git    | 入 git，文件头加 `/* AUTO-GENERATED — DO NOT EDIT */`                                     |
+| `contracts.ts` | 完全生成式                                                                               |
+| 运行时入口导出        | 函数 `initI18n(options?)`                                                             |
+| 错误策略           | dev 不阻塞（overlay + console.warn）；build 阻塞；CLI 阻塞                                     |
+| 命名映射           | folder 模式按 `base/` 文件名；file 模式自动 `kebab ↔ camelCase`，可 `nameTransform` 关            |
+| JS 项目          | 可用但无类型提示，不单独适配                                                                      |
+| 交互式 CLI 依赖     | `@clack/prompts`                                                                    |
+
 
 ---
 
 ## 2. 阶段划分
 
-| 阶段 | 目标 | 可验证产物 |
-|---|---|---|
-| **Phase 0** | 基础设施改造（改名、重构目录、多入口构建、依赖） | `pnpm build` 能产出 `dist/core` `dist/plugin` `dist/cli` 三入口空壳 |
-| **Phase 1** | Core 纯逻辑（contracts 扫描 + folder 模式扫描 + 4 类产物生成） | 有单测覆盖；能通过 node 脚本调用 `generateAll(config)` 生成 4 个文件 |
-| **Phase 2** | Plugin（HMR + overlay） + CLI（交互式 init/add/generate） | `examples/` 中的 fixture 工程跑通真实闭环 |
-| **Phase 3** *(未细化)* | 单文件模式 + 懒加载 runtime + `doctor` | - |
+
+| 阶段                  | 目标                                                 | 可验证产物                                                       |
+| ------------------- | -------------------------------------------------- | ----------------------------------------------------------- |
+| **Phase 0**         | 基础设施改造（改名、重构目录、多入口构建、依赖）                           | `pnpm build` 能产出 `dist/core` `dist/plugin` `dist/cli` 三入口空壳 |
+| **Phase 1**         | Core 纯逻辑（contracts 扫描 + folder 模式扫描 + 4 类产物生成）     | 有单测覆盖；能通过 node 脚本调用 `generateAll(config)` 生成 4 个文件          |
+| **Phase 2**         | Plugin（HMR + overlay） + CLI（交互式 init/add/generate） | `examples/` 中的 fixture 工程跑通真实闭环                             |
+| **Phase 3** *(未细化)* | 单文件模式 + 懒加载 runtime + `doctor`                     | -                                                           |
+
 
 Phase 1 是最重的核心部分；Phase 2 只是套壳；Phase 3 待 Phase 2 落地后再细化。
 
@@ -109,29 +113,45 @@ P0-01 改包元信息
 
 ## 4. 进度追踪
 
-在完成某个任务后，把 `[ ]` 改成 `[x]`，并在右侧写完成日期。
+> 状态符号：⬜ 待办 ｜ 🟡 进行中 ｜ ✅ 已完成 ｜ ⏸ 暂缓 ｜ ❌ 已废弃
+> 完成时把状态改成 ✅，并在「完成日期」列填上 `YYYY-MM-DD`。
 
 ### Phase 0：基础设施
-- [ ] **P0-01** 改包元信息（`package.json` 改名 / peerDeps / scripts）
-- [ ] **P0-02** 重构 `src/` 目录（`core` / `plugin` / `cli` / `index.ts`）
-- [ ] **P0-03** Vite 多入口构建 + `package.json.exports`
-- [ ] **P0-04** 补齐 dev/peer 依赖
+
+
+| 状态  | ID        | 任务                                                   | 完成日期       |
+| --- | --------- | ---------------------------------------------------- | ---------- |
+| ✅  | **P0-01** | 改包元信息（`package.json` 改名 / peerDeps / scripts）        | 2026/04/19 |
+| ⬜   | **P0-02** | 重构 `src/` 目录（`core` / `plugin` / `cli` / `index.ts`） | —          |
+| ⬜   | **P0-03** | Vite 多入口构建 + `package.json.exports`                  | —          |
+| ⬜   | **P0-04** | 补齐 dev/peer 依赖                                       | —          |
+
 
 ### Phase 1：Core 纯逻辑
-- [ ] **P1-01** `core/types.ts`（Config / ScanResult / 错误类型）
-- [ ] **P1-02** `core/scan-contracts.ts`
-- [ ] **P1-03** `core/scan-locales-folder.ts`
-- [ ] **P1-04** `core/validate.ts`
-- [ ] **P1-05** `core/emit/resources.ts`
-- [ ] **P1-06** `core/emit/contracts.ts`
-- [ ] **P1-07** `core/emit/runtime.ts`（eager 版本）
-- [ ] **P1-08** `core/emit/dts.ts`
-- [ ] **P1-09** `core/orchestrate.ts`（`generateAll(config)` 入口）
-- [ ] **P1-10** 单元测试（覆盖率 ≥ 85%）
-- [ ] **P1-11** Fixture 工程（`__tests__/fixtures/basic/`）
 
-### Phase 2：Plugin + CLI（待 Phase 1 完成后细化）
-- [ ] P2-README 参见 `phase-2.md`
+
+| 状态  | ID        | 任务                                              | 完成日期 |
+| --- | --------- | ----------------------------------------------- | ---- |
+| ⬜   | **P1-01** | `core/types.ts`（Config / ScanResult / 错误类型）     | —    |
+| ⬜   | **P1-02** | `core/scan-contracts.ts`                        | —    |
+| ⬜   | **P1-03** | `core/scan-locales-folder.ts`                   | —    |
+| ⬜   | **P1-04** | `core/validate.ts`                              | —    |
+| ⬜   | **P1-05** | `core/emit/resources.ts`                        | —    |
+| ⬜   | **P1-06** | `core/emit/contracts.ts`                        | —    |
+| ⬜   | **P1-07** | `core/emit/runtime.ts`（eager 版本）                | —    |
+| ⬜   | **P1-08** | `core/emit/dts.ts`                              | —    |
+| ⬜   | **P1-09** | `core/orchestrate.ts`（`generateAll(config)` 入口） | —    |
+| ⬜   | **P1-10** | 单元测试（覆盖率 ≥ 85%）                                 | —    |
+| ⬜   | **P1-11** | Fixture 工程（`__tests__/fixtures/basic/`）         | —    |
+
+
+### Phase 2：Plugin + CLI
+
+
+| 状态  | ID      | 任务                                              | 完成日期 |
+| --- | ------- | ----------------------------------------------- | ---- |
+| ⏸   | **P2-** | 待 Phase 1 完成后细化，详见 `[phase-2.md](./phase-2.md)` | —    |
+
 
 ---
 
@@ -147,3 +167,4 @@ P0-01 改包元信息
 - [Phase 0：基础设施](./phase-0.md)
 - [Phase 1：Core 纯逻辑](./phase-1.md)
 - [Phase 2：Plugin + CLI 大纲](./phase-2.md)
+

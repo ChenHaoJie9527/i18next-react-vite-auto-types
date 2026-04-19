@@ -10,7 +10,10 @@
     "vite-plugin-dts": "^4.5.4",
     "vitest": "^4.1.4"
   },
-  "name": "i18next-react-vite-auto-types",
+  "name": "i18next-kit",
+  "bin": {
+    "i18next-kit": "dist/cli/index.js"
+  },
   "scripts": {
     "dev": "vite build --watch",
     "build": "vite build",
@@ -24,8 +27,8 @@
     "fix": "ultracite fix"
   },
   "type": "module",
-  "version": "0.0.1",
-  "description": "A JS library scaffolded with Vite + TypeScript + Vitest.",
+  "version": "0.1.0",
+  "description": "Type-safe i18next toolkit for Vite + React: scaffold,scan,and generate namespaces & types.",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -46,14 +49,26 @@
     "node": ">=20"
   },
   "keywords": [
-    "typescript",
+    "i18next",
+    "react",
     "vite",
-    "vitest",
-    "library"
+    "vite-plugin",
+    "i18n",
+    "typescript",
+    "codegen"
   ],
   "license": "MIT",
-  "dependencies": {
-    "i18next": "^26.0.6",
-    "react-i18next": "^17.0.4"
+  "peerDependencies": {
+    "i18next": "^23 || ^24 || ^25 || ^26",
+    "react-i18next": "^14 || ^15 || ^16 || ^17",
+    "vite": "^5 || ^6 || ^7 || ^8"
+  },
+  "peerDependenciesMeta": {
+    "react-i18next": {
+      "optional": true
+    },
+    "i18next-resources-to-backend": {
+      "optional": true
+    }
   }
 }
