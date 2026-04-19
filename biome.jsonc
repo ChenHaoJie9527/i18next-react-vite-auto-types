@@ -1,4 +1,11 @@
 {
   "extends": ["ultracite/biome/core", "ultracite/biome/react"],
-  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json"
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "linter": {
+    "rules": {
+      "performance": {
+        "noBarrelFile": "off"
+      }
+    }
+  }
 }
