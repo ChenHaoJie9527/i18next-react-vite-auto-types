@@ -1,9 +1,13 @@
 {
   "devDependencies": {
     "@biomejs/biome": "^2.4.12",
+    "@clack/prompts": "^1.2.0",
     "@types/node": "^25.6.0",
+    "@types/tmp": "^0.2.6",
     "@vitest/coverage-v8": "^4.1.4",
     "@vitest/ui": "^4.1.4",
+    "picocolors": "^1.1.1",
+    "tmp": "^0.2.5",
     "typescript": "^6.0.3",
     "ultracite": "^7.6.0",
     "vite": "^8.0.8",
@@ -42,9 +46,6 @@
       "types": "./dist/core/index.d.ts",
       "import": "./dist/core/index.js",
       "require": "./dist/core/index.cjs"
-    },
-    "bin": {
-      "i18next-kit": "dist/cli/index.js"
     }
   },
   "files": [
@@ -68,6 +69,7 @@
   "license": "MIT",
   "peerDependencies": {
     "i18next": "^23 || ^24 || ^25 || ^26",
+    "i18next-resources-to-backend": "^1",
     "react-i18next": "^14 || ^15 || ^16 || ^17",
     "vite": "^5 || ^6 || ^7 || ^8"
   },

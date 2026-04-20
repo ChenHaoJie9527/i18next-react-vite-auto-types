@@ -192,39 +192,55 @@ dts({
 ### 前置
 P0-03
 
-### 要装的依赖
+### 要装的依赖（含决策）
 
-**devDependencies**（全部）：
+#### devDependencies
 
-| 包 | 用途 | 出现阶段 |
+| 包 | 用途 | 出现阶段 | 决策 |
+|---|---|---|---|
+| [`@biomejs/biome`](https://www.npmjs.com/package/@biomejs/biome) | Lint + Format | 全程 | ✅ 已有 |
+| [`@types/node`](https://www.npmjs.com/package/@types/node) | Node 类型 | 全程 | ✅ 已有 |
+| [`typescript`](https://www.npmjs.com/package/typescript) | TS 编译器 | 全程 | ✅ 已有 |
+| [`ultracite`](https://www.npmjs.com/package/ultracite) | Biome 预设 | 全程 | ✅ 已有 |
+| [`vite`](https://www.npmjs.com/package/vite) | 构建 | 全程 | ✅ 已有 |
+| [`vite-plugin-dts`](https://www.npmjs.com/package/vite-plugin-dts) | 产出 d.ts | P0 | ✅ 已有 |
+| [`vitest`](https://www.npmjs.com/package/vitest) / [`@vitest/coverage-v8`](https://www.npmjs.com/package/@vitest/coverage-v8) / [`@vitest/ui`](https://www.npmjs.com/package/@vitest/ui) | 单测 + 覆盖率 + UI | P1-10 | ✅ 已有 |
+| [`@clack/prompts`](https://www.npmjs.com/package/@clack/prompts) | 交互式 CLI（[GitHub](https://github.com/natemoo-re/clack)） | P2 | ✅ 装 |
+| [`picocolors`](https://www.npmjs.com/package/picocolors) | 终端彩色输出（轻量版 chalk） | P1/P2 | ✅ 装 |
+| [`tmp`](https://www.npmjs.com/package/tmp) + [`@types/tmp`](https://www.npmjs.com/package/@types/tmp) | 单测临时目录（真实磁盘） | P1-10 | ✅ 装 |
+| [`memfs`](https://www.npmjs.com/package/memfs) | 内存 FS 模拟 | - | ❌ 不装（和 tmp 二选一，选了 tmp） |
+| [`chokidar`](https://www.npmjs.com/package/chokidar) | 文件 watcher | - | ❌ 不装（Vite `server.watcher` 自带，够用） |
+
+#### peerDependencies
+
+| 包 | 用途 | optional |
 |---|---|---|
-| `@types/node` | ✅ 已有 | - |
-| `vite` | ✅ 已有 | - |
-| `vitest` / `@vitest/coverage-v8` / `@vitest/ui` | ✅ 已有 | P1-10 |
-| `@clack/prompts` | 交互式 CLI | P2 |
-| `picocolors` | 终端彩色输出 | P1/P2 |
-| `chokidar` | （如果后面发现 Vite 自带 watcher 不够用时备用，先不装也可） | P2 |
-| `memfs` | 单测里模拟文件系统（强烈推荐） | P1-10 |
-| `tmp` | 单测里生成临时目录（memfs 的替代方案） | P1-10 |
+| [`vite`](https://www.npmjs.com/package/vite) `^5 \|\| ^6 \|\| ^7 \|\| ^8` | 必须 | 否 |
+| [`i18next`](https://www.npmjs.com/package/i18next) `^23 \|\| ^24 \|\| ^25 \|\| ^26` | 必须 | 否 |
+| [`react-i18next`](https://www.npmjs.com/package/react-i18next) `^14 \|\| ^15 \|\| ^16 \|\| ^17` | 可选 | ✅ 是 |
+| [`i18next-resources-to-backend`](https://www.npmjs.com/package/i18next-resources-to-backend) `^1` | 懒加载 runtime | ✅ 是 |
 
-**peerDependencies**（声明即可，实际安装留给用户）：
+### 一次装齐命令
 
-| 包 | 用途 |
-|---|---|
-| `vite` | 必须 |
-| `i18next` | 必须 |
-| `react-i18next` | 可选（optional） |
-| `i18next-resources-to-backend` | 可选（懒加载 runtime 时） |
+```bash
+pnpm add -D @clack/prompts picocolors tmp @types/tmp
+```
 
 ### 实现提示
-- 从 `dependencies` 移除 `i18next` / `react-i18next`，改到 `peerDependencies`
+
+- 从 `dependencies` 移除 `i18next` / `react-i18next`，改到 `peerDependencies`（P0-01 已做）
 - **不要**把 `vite` 放进 `dependencies`，否则用户装你的包会带一份重复 vite
-- `memfs` 和 `tmp` 二选一即可，推荐 `memfs` 更快，但 `tmp` 语义更直观。第一次实现可用 `tmp` + 真实磁盘（节点写文件也就 ms 级），后面再看要不要换
+- `peerDependenciesMeta.optional` 条目**必须**在 `peerDependencies` 里有对应版本声明，否则 npm/pnpm 都会告警
+- `picocolors` 选择理由：比 `chalk` 小 14 倍，API 子集够用；CLI 工具标配
+- `tmp` 选择理由：Node 原生 `fs` + 真实磁盘，测试行为真实，单测里 `dir.removeCallback()` 自动清理
+- `@types/tmp` 必须单独装（`tmp` 本身没带类型声明）
 
 ### 验收（DoD）
 - [ ] `pnpm install` 无 warning（peer 未装的警告可接受）
 - [ ] `pnpm build` / `pnpm test` 仍通过
 - [ ] `package.json` 的依赖分类清晰（dev vs peer），没有把 peer 塞进 dependencies
+- [ ] `peerDependenciesMeta` 里的每个包都能在 `peerDependencies` 里找到对应版本声明
+- [ ] `package.json.exports` 里**只有** `.` 和 `./core`（不要有 `bin` 等非法字段，`bin` 属于顶层字段）
 
 ---
 

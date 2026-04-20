@@ -124,7 +124,7 @@ P0-01 改包元信息
 | ✅   | **P0-01** | 改包元信息（`package.json` 改名 / peerDeps / scripts）        | 2026/04/19 |
 | ✅   | **P0-02** | 重构 `src/` 目录（`core` / `plugin` / `cli` / `index.ts`） | 2026/04/19 |
 | ✅   | **P0-03** | Vite 多入口构建 + `package.json.exports`                  | 2026/04/20 |
-| ⬜   | **P0-04** | 补齐 dev/peer 依赖                                       | —          |
+| ✅   | **P0-04** | 补齐 dev/peer 依赖                                       | 2026/04/20         |
 
 
 ### Phase 1：Core 纯逻辑
