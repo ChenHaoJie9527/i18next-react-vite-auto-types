@@ -8,9 +8,9 @@ export default defineConfig({
   plugins: [
     dts({
       tsconfigPath: "./tsconfig.json",
-      rollupTypes: true,
       include: ["src"],
       exclude: ["**/*.test.ts", "**/*.spec.ts"],
+      entryRoot: "src",
     }),
   ],
   build: {

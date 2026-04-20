@@ -121,9 +121,9 @@ P0-01 改包元信息
 
 | 状态  | ID        | 任务                                                   | 完成日期       |
 | --- | --------- | ---------------------------------------------------- | ---------- |
-| ✅  | **P0-01** | 改包元信息（`package.json` 改名 / peerDeps / scripts）        | 2026/04/19 |
-| ✅   | **P0-02** | 重构 `src/` 目录（`core` / `plugin` / `cli` / `index.ts`） | 2026/04/19          |
-| ⬜   | **P0-03** | Vite 多入口构建 + `package.json.exports`                  | —          |
+| ✅   | **P0-01** | 改包元信息（`package.json` 改名 / peerDeps / scripts）        | 2026/04/19 |
+| ✅   | **P0-02** | 重构 `src/` 目录（`core` / `plugin` / `cli` / `index.ts`） | 2026/04/19 |
+| ✅   | **P0-03** | Vite 多入口构建 + `package.json.exports`                  | 2026/04/20 |
 | ⬜   | **P0-04** | 补齐 dev/peer 依赖                                       | —          |
 
 

@@ -147,16 +147,39 @@ build: {
 > 注意：`./cli` **不需要出现在 exports**，因为 CLI 是通过 `bin` 而不是 `import` 调用的。
 
 #### 3. `vite-plugin-dts`
-`dts({ include: ['src'] })` 当前配置 OK，但要确认它为多 entry 都产出 `.d.ts`；如有问题，调整 `entryRoot: 'src'`。
+
+```ts
+dts({
+  tsconfigPath: './tsconfig.json',
+  include: ['src'],
+  exclude: ['**/*.test.ts', '**/*.spec.ts'],
+  entryRoot: 'src',
+  // ❌ 不要开 rollupTypes: true（见下方「常见坑」）
+})
+```
+
+> ⚠️ **常见坑 — `rollupTypes: true` 在多入口下会吃掉类型**
+>
+> `vite-plugin-dts` 的 `rollupTypes: true` 只对**单入口**表现正常。多入口时它只给"主入口" rollup，
+> 主入口里 `export * from './plugin'` 的 re-export 链会被中断，导致 `dist/index.d.ts` 里只剩 `export {}`。
+>
+> **症状**：运行时 `dist/index.js` 正常导出 `i18nextKit`，但 IDE 里报
+> `模块 "i18next-kit" 没有导出的成员 "i18nextKit"`，TS 编译器也红线。
+>
+> **解决**：去掉 `rollupTypes`，改用 `entryRoot: 'src'` 按源码目录结构产出 d.ts。
+> 产物会变成 `dist/index.d.ts` + `dist/plugin/index.d.ts` + `dist/core/index.d.ts`，
+> 通过 re-export 链正常工作。radix-ui、@clack/prompts 等多入口库都是这个做法。
 
 ### 实现提示
 - CLI 产物的 shebang：可在 `vite.config.ts` 里加一个小自定义 rollup 插件 `renderChunk` 时给 `cli/index.js` 顶部加 `#!/usr/bin/env node`（或者在 build 后加钩子脚本）
 - 构建后需 `chmod +x dist/cli/index.js`，可在 `scripts.build` 后串一行 `&& chmod +x dist/cli/index.js`（Windows 无需）
+- 插件占位函数的 `name` 字段**必须是字符串常量**（如 `'i18next-kit'`），不要放 config 对象，否则 Vite 启动时会警告 "plugin without a name"
 
 ### 验收（DoD）
 - [ ] `pnpm build` 成功，`dist/` 下有 `index.*`、`core/index.*`、`cli/index.*` 及对应 `.d.ts`
+- [ ] `dist/index.d.ts` 内容**不是** `export { }`（避免 rollupTypes 坑）
 - [ ] `dist/cli/index.js` 第一行是 shebang 且有可执行权限
-- [ ] 在另一个 test 项目里 `pnpm link` 后，`import { i18nextKit } from 'i18next-kit'` 类型完整
+- [ ] 在另一个 test 项目里（推荐用 `pnpm add -D file:/absolute/path` 方案）`import { i18nextKit } from 'i18next-kit'` 类型完整，误传 options 会 TS 报错
 - [ ] `npx i18next-kit` 能打印出占位信息（不报错）
 
 ---
