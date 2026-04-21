@@ -1,456 +1,565 @@
-# Phase 1：Core 纯逻辑（场景驱动版）
+# Phase 1：Core 纯逻辑 — 像造自行车一样
 
-> 这份文档的叙事方式：**不从类型定义开始**，而是**从"你想最终看到什么"反推**每一步要做什么。
-> 每个里程碑（M1~M6）都是**端到端跑得通的版本**，你会在每一步结束时亲眼看到产物，然后进入下一步再换零件、加功能。
+> **这份文档从头到尾线性阅读即可**。
+> 每个 Step 都只做一件小事，大多数在 **5–20 分钟** 内完成。
+> 每 4–6 个 Step 汇聚成一个 🏁 **里程碑**，在里程碑收尾处写一个单元测试锁住当前行为——
+> 从此以后，后面的 Step 不会偷偷把前面做好的东西搞坏。
 >
-> 旧版本（按文件切任务的 P1-01 ~ P1-11）已备份到 [`phase-1.legacy.md`](./phase-1.legacy.md)，作为数据结构/签名的参考词典。
+> 开工前记住三句话：
+> 1. **不要提前定义类型**。等真正有两处用到同一个 shape 时再抽。
+> 2. **不要提前配置**。硬编码路径和魔法字符串都是允许的，直到你自己烦了。
+> 3. **不要提前做边界处理**。坏输入就让它炸，等我们在某个 Step 明确说"这一步来加保护"才加。
 
 ---
 
-## 0. 终点预览：我们要做什么
+## 路线图一览
 
-在所有里程碑完成后，这个 core 包对外就是一个函数：
+| 🏁 里程碑 | 场景上的价值 | 步骤 |
+|---|---|---|
+| **M1 第一个能转的轮子** | 能读目录，吐出 namespace 名字数组 | Step 01–06 |
+| **M2 第一段会说话的字符串** | 把数组拼成一段合法的 TS 代码打印出来 | Step 07–12 |
+| **M3 让它真的写文件** | 产物落盘、幂等、原子；fixture 里 `tsc` 能过 | Step 13–17 |
+| **M4 让 tsc 成为守门员** | contracts.ts 诞生，删个 locale 文件就 tsc 报错 | Step 18–22 |
+| **M5 让 `t('hello')` 有补全** | runtime + dts，fixture 里 App.tsx 有类型提示 | Step 23–26 |
+| **M6 让错误说人话** | 错误码体系 + validate，坏数据有彩色报告 | Step 27–30 |
+| **M7 一键串起来 + 收官** | `generateAll()` 单一入口 + 覆盖率 ≥ 85% | Step 31–35 |
+
+---
+
+## 通用约定
+
+- **fixture 位置**：`__tests__/fixtures/basic/`，整个 Phase 1 就围绕它长
+- **临时驱动脚本**：`scripts/dev-run.mjs`，用来跑 core 函数并肉眼看效果
+- **跑一次循环**：`pnpm build && node scripts/dev-run.mjs`（Step 34 会引入 `tsx` 省去 build）
+- **验证命令**：后文出现的 `✓ 验证` 一律是在 Phase 1 主仓库目录下执行
+
+---
+
+## 🏁 M1. 第一个能转的轮子
+
+**这一轮结束时你拥有的东西**：一个函数 `scanContracts(dir)`，喂目录路径，吐出数组 `[{ name: 'common', typeName: 'CommonMessage' }]`。就这。
+没有类型定义，没有 config 对象，没有错误处理。
+
+---
+
+### Step 01. 建一个只有一个文件的 fixture
+
+只做一件事：给 fixture 起个头。
+
+```bash
+mkdir -p __tests__/fixtures/basic/base
+echo "export type CommonMessage = { hello: string };" > __tests__/fixtures/basic/base/common.ts
+```
+
+✓ 验证：`ls __tests__/fixtures/basic/base/` 看到 `common.ts`。
+
+---
+
+### Step 02. 写第一个能读到这个目录的函数
+
+新建 `src/core/scan-contracts.ts`：
 
 ```ts
-import { generateAll } from 'i18next-kit/core';
+import { readdirSync } from 'node:fs';
 
-await generateAll({
-  root: process.cwd(),
-  i18nDir: 'src/i18n',
-  locales: ['en-US', 'zh-CN', 'zh-HK'],
-  mode: 'folder',
+export function scanContracts(dir: string) {
+  return readdirSync(dir);
+}
+```
+
+在 `src/core/index.ts` 里 re-export（之前是空占位）：
+
+```ts
+export { scanContracts } from './scan-contracts';
+```
+
+新建 `scripts/dev-run.mjs`：
+
+```js
+import { scanContracts } from '../dist/core/index.js';
+
+console.log(scanContracts('./__tests__/fixtures/basic/base'));
+```
+
+✓ 验证：
+
+```bash
+pnpm build && node scripts/dev-run.mjs
+# → [ 'common.ts' ]
+```
+
+看到数组就成功。**这是你造出来的第一个轮子，花了 10 分钟，它能转。**
+
+---
+
+### Step 03. 过滤只保留 `.ts` 文件
+
+在 fixture 里故意扔一个干扰项：
+
+```bash
+echo "type Foo = {};" > __tests__/fixtures/basic/base/common.d.ts
+```
+
+再跑 `pnpm build && node scripts/dev-run.mjs` —— 输出里多了 `common.d.ts`，我们不想要它。
+
+修改 `scan-contracts.ts`：
+
+```ts
+return readdirSync(dir).filter(
+  (f) => f.endsWith('.ts') && !f.endsWith('.d.ts'),
+);
+```
+
+✓ 验证：输出恢复为 `[ 'common.ts' ]`。
+
+---
+
+### Step 04. 去掉 `.ts` 后缀，只返回名字
+
+```ts
+return readdirSync(dir)
+  .filter((f) => f.endsWith('.ts') && !f.endsWith('.d.ts'))
+  .map((f) => f.replace(/\.ts$/, ''));
+```
+
+✓ 验证：`[ 'common' ]`。
+
+---
+
+### Step 05. 返回结构化对象，为将来留空间
+
+```ts
+return readdirSync(dir)
+  .filter((f) => f.endsWith('.ts') && !f.endsWith('.d.ts'))
+  .map((f) => ({ name: f.replace(/\.ts$/, '') }));
+```
+
+✓ 验证：`[ { name: 'common' } ]`。
+
+> 现在函数从"返回 string[]"升级成了"返回 object[]"，但**还是没定义任何 `interface`**。等有第二个地方需要这个类型时再抽。
+
+---
+
+### Step 06. 加 `typeName` 字段，顺便处理 `kebab-case`
+
+先再扔一个 fixture 进去：
+
+```bash
+echo "export type UserManagementMessage = { title: string };" \
+  > __tests__/fixtures/basic/base/user-management.ts
+```
+
+在 `scan-contracts.ts` 顶部加一个小工具函数：
+
+```ts
+function toPascalCase(s: string): string {
+  return s
+    .split(/[-_]/)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join('');
+}
+```
+
+然后 map 里补一行：
+
+```ts
+.map((f) => {
+  const name = f.replace(/\.ts$/, '');
+  return { name, typeName: toPascalCase(name) + 'Message' };
 });
 ```
 
-**输入**（用户的 i18n 源目录）：
-
-```
-src/i18n/
-├── base/
-│   ├── common.ts              export type CommonMessage = { hello: string };
-│   ├── file.ts                export type FileMessage = { upload: string };
-│   └── user-management.ts     export type UserManagementMessage = { title: string };
-├── en-US/
-│   ├── common.ts              export default { hello: 'Hello' } satisfies CommonMessage;
-│   ├── file.ts
-│   └── user-management.ts
-├── zh-CN/  (同上)
-└── zh-HK/  (同上)
-```
-
-**输出**（4 个生成文件）：
-
-```
-src/i18n/
-├── generated-resources.ts     ← namespace 类型入口（供 i18next.d.ts 用）
-├── contracts.ts               ← 编译期强约束（删个 locale 文件就会 tsc 报错）
-├── generated-runtime.ts       ← 运行时初始化函数 initI18n(options?)
-└── i18next.d.ts               ← declare module "i18next" { CustomTypeOptions ... }
-```
-
-写完的 core 能做到：
-
-- **增量确定**：同样的输入 → 两次生成内容完全一致，git diff 永远空
-- **错误清晰**：缺文件 / 缺目录 / 配置非法 → 有明确 error code 和 message
-- **零副作用**：除了 `outDir` 下的产物文件，不碰用户目录里的任何其它东西
-- **可单测**：所有扫描/生成函数都是纯函数，可以喂假输入拿确定输出
-
----
-
-## 1. 里程碑规划（自顶向下反推）
-
-| 里程碑 | 场景目标 | 关键产物 | 预估时间 |
-|---|---|---|---|
-| 🎯 **M1** | 1 ns × 1 locale → 终端打印出 `generated-resources.ts` 内容 | 最小扫描 + 最小 emit + 临时驱动脚本 | 1h |
-| 🎯 **M2** | 3 ns × 3 locale → 产物包含全部 namespace + kebab-case 正确处理 | locales 扫描 + 扩展 emit | 1h |
-| 🎯 **M3** | 首次写盘 `contracts.ts`，故意删 locale 文件 → `tsc` 报错 | `emit/contracts.ts` + 写盘 | 1.5h |
-| 🎯 **M4** | fixture 里 `t('hello')` 有 IDE 补全 | `emit/runtime.ts` + `emit/dts.ts` | 1h |
-| 🎯 **M5** | 坏数据能被精准定位：缺文件 / 空目录 / 非法配置 | `validate.ts` + 错误码系统 | 1.5h |
-| 🎯 **M6** | 丢掉临时脚本，只用 `generateAll(config)` + 单测锁住 | `orchestrate.ts` + 完整单测 | 2h |
-
-> **DAG**：M1 → M2 → M3 → M4 → M5 → M6，严格线性。每个里程碑都依赖前一个的产物。
->
-> **节奏提醒**：**每个 M 做完务必亲自跑一遍"完成后你能看到"的验证**，再开下一个。这是这版文档的核心设计，不要跳过。
-
----
-
-## 🎯 M1. 最小闭环 —— 让第一份产物诞生
-
-### 场景
-
-你希望在本仓库根目录跑：
+✓ 验证：
 
 ```bash
-node scripts/dev-run.mjs
+pnpm build && node scripts/dev-run.mjs
+# [
+#   { name: 'common', typeName: 'CommonMessage' },
+#   { name: 'user-management', typeName: 'UserManagementMessage' }
+# ]
 ```
 
-然后在终端里看到这样一段合法的 TypeScript 代码被打印出来：
+---
+
+### 🏁 M1 单元测试：锁住 scanContracts 的行为
+
+新建 `src/core/scan-contracts.test.ts`：
 
 ```ts
-/**
- * AUTO-GENERATED by i18next-kit — DO NOT EDIT.
- */
-import type { CommonMessage } from '../base/common';
+import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
+import { scanContracts } from './scan-contracts';
 
-export const defaultNS = 'common' as const;
+function makeTmpDir() {
+  const dir = mkdtempSync(join(tmpdir(), 'i18next-kit-test-'));
+  return dir;
+}
 
-export const resourceNamespaces = {
-  common: {} as CommonMessage,
-} as const;
+describe('scanContracts', () => {
+  it('返回目录下的 .ts 文件名，忽略 .d.ts', () => {
+    const dir = makeTmpDir();
+    writeFileSync(join(dir, 'common.ts'), '');
+    writeFileSync(join(dir, 'common.d.ts'), '');
+    writeFileSync(join(dir, 'file.ts'), '');
 
-export type I18nNamespace = keyof typeof resourceNamespaces;
+    const result = scanContracts(dir);
+
+    expect(result).toEqual(
+      expect.arrayContaining([
+        { name: 'common', typeName: 'CommonMessage' },
+        { name: 'file', typeName: 'FileMessage' },
+      ]),
+    );
+    expect(result).toHaveLength(2);
+  });
+
+  it('kebab-case 命名会正确 Pascal 化', () => {
+    const dir = makeTmpDir();
+    writeFileSync(join(dir, 'user-management.ts'), '');
+
+    expect(scanContracts(dir)).toEqual([
+      { name: 'user-management', typeName: 'UserManagementMessage' },
+    ]);
+  });
+});
 ```
 
-### 为什么现在做这一步
+✓ 验证：
 
-你需要一个"**最小可行闭环**"来验证整条路线的假设：
-- Node 能扫描到 `.ts` 文件吗？✅
-- 字符串模板能拼出合法 TS 吗？✅
-- 终端打印的产物贴到 VSCode 里 `tsc --noEmit` 能过吗？✅
+```bash
+pnpm test
+# ✓ scan-contracts (2)
+```
 
-一旦这条"1→2→3"的链路通了，后面的所有里程碑都是在这条链路上**加功能**或**换零件**，不会再遇到"咦，原来走不通"的系统性风险。
+绿了就可以进 M2。
 
-### 这一轮要新建/修改的文件
+---
 
-| 文件 | 动作 | 目的 |
-|---|---|---|
-| `__tests__/fixtures/basic/base/common.ts` | 新建 | 最简契约 `export type CommonMessage = { hello: string }` |
-| `__tests__/fixtures/basic/en-US/common.ts` | 新建 | `export default { hello: 'Hello' } satisfies CommonMessage` |
-| `src/core/types.ts` | 填充 | 最小 `ResolvedConfig` + `ScannedNamespace` + `AUTOGEN_HEADER` |
-| `src/core/scan-contracts.ts` | 填充 | `scanContracts(config): ScannedNamespace[]` |
-| `src/core/emit/resources.ts` | 新建 | `emitResources(namespaces, config): string` |
-| `src/core/emit/index.ts` | 新建 | `export * from './resources'` |
-| `src/core/index.ts` | 修改 | re-export 以上两个函数 |
-| `scripts/dev-run.mjs` | 新建 | 临时驱动，import 上述函数并 `console.log(emitResources(...))` |
+## 🏁 M2. 第一段会说话的字符串
 
-### 关键实现要点
+**这一轮结束时你拥有的东西**：一个 `emitResources(namespaces)` 函数，喂它 Step 06 的扫描结果，吐出一段合法的 TypeScript 代码（字符串），粘到 VSCode 里 `tsc` 能过。
 
-#### `types.ts` 只放当下这一轮用得上的
+---
+
+### Step 07. 写第一版 `emitResources`，返回写死的字符串
+
+新建 `src/core/emit/resources.ts`：
+
 ```ts
-export interface ResolvedConfig {
-  root: string;
-  i18nDir: string;        // absolute
-  contractsDir: string;   // absolute
-  outDir: string;         // absolute
-  locales: readonly string[];
+export function emitResources() {
+  return `export const defaultNS = 'common' as const;\n`;
 }
-
-export interface ScannedNamespace {
-  name: string;           // 'common'
-  typeName: string;       // 'CommonMessage'
-  typeImportPath: string; // '../base/common'（相对 outDir，无 .ts 后缀）
-}
-
-export const AUTOGEN_HEADER = `/**
- * AUTO-GENERATED by i18next-kit — DO NOT EDIT.
- */
-`;
 ```
-> **故意不做**：`I18nextKitConfig`（用户面向的含 optional 的 config）、`ValidationReport`、`I18nextKitError` —— 都留给后面的里程碑。类型驱动开发的反面教材是"一上来把所有类型都定义完"，这里刻意避免。
 
-#### `scan-contracts.ts` 的最小实现
-- `readdirSync(config.contractsDir, { withFileTypes: true })`
-- 过滤 `.isFile() && name.endsWith('.ts') && !name.endsWith('.d.ts')`
-- 每个文件算出 `name` / `typeName`（PascalCase + 'Message'）/ `typeImportPath`
+在 `src/core/index.ts` 补 export：
 
-PascalCase 这一轮**只需要处理单词情况**（如 `common` → `Common`），带连字符的等 M2 再升级。
+```ts
+export { emitResources } from './emit/resources';
+```
 
-#### `emit/resources.ts` 就是拼字符串
-- 为每个 namespace 生成一行 `import type { XxxMessage } from '...'`
-- `defaultNS` 选 `namespaces[0].name`（M1 只有 1 个所以不纠结）
-- `resourceNamespaces` 里每项形如 `common: {} as CommonMessage,`
+修改 `scripts/dev-run.mjs`：
 
-#### `scripts/dev-run.mjs` 的样子
 ```js
-import path from 'node:path';
-import { scanContracts, emitResources } from '../src/core/index.js';
+import { scanContracts, emitResources } from '../dist/core/index.js';
 
-const root = path.resolve('__tests__/fixtures/basic');
-const config = {
-  root,
-  i18nDir: root,
-  contractsDir: path.join(root, 'base'),
-  outDir: root,
-  locales: ['en-US'],
-};
-
-const namespaces = scanContracts(config);
-console.log(emitResources(namespaces, config));
+const namespaces = scanContracts('./__tests__/fixtures/basic/base');
+console.log(emitResources());
 ```
 
-> **注意**：`dev-run.mjs` import 的是 `src/core/index.js` 还是 `src/core/index.ts`？我们是 `vite build --watch` 模式，所以应该 import 编译后产物路径 `dist/core/index.js`。或者简单粗暴 **先跑一次 `pnpm build`** 再 `node` 驱动脚本。
-> 如果嫌慢，M6 改成用 `tsx` 或 `vite-node` 直接跑 TS。M1 先 build → run 最省事。
-
-### 完成后你能看到
-
-**终端输出**：
+✓ 验证：
 
 ```bash
-$ pnpm build && node scripts/dev-run.mjs
-/**
- * AUTO-GENERATED by i18next-kit — DO NOT EDIT.
- */
-import type { CommonMessage } from '../base/common';
-
-export const defaultNS = 'common' as const;
-
-export const resourceNamespaces = {
-  common: {} as CommonMessage,
-} as const;
-
-export type I18nNamespace = keyof typeof resourceNamespaces;
+pnpm build && node scripts/dev-run.mjs
+# export const defaultNS = 'common' as const;
 ```
 
-**验证这段输出是合法 TS**：
-
-```bash
-node scripts/dev-run.mjs > /tmp/out.ts
-cd __tests__/fixtures/basic
-npx tsc --noEmit /tmp/out.ts    # 应该零错误
-```
-
-### M1 验收清单
-
-| 状态 | 项 |
-|:--:|---|
-| ⬜ | `__tests__/fixtures/basic/base/common.ts` 存在且导出 `CommonMessage` |
-| ⬜ | `__tests__/fixtures/basic/en-US/common.ts` 存在 |
-| ⬜ | `pnpm build` 成功，无 TS 错误 |
-| ⬜ | `node scripts/dev-run.mjs` 打印出如上产物 |
-| ⬜ | 产物粘贴到 VSCode → tsc --noEmit 零错误 |
-
-### M1 故意没做的事（不要超前）
-
-- ❌ 多 namespace / 多 locale
-- ❌ kebab-case 命名
-- ❌ 写文件到磁盘
-- ❌ contracts / runtime / dts
-- ❌ 任何校验
-- ❌ 任何单测
-
-这些都是后面里程碑的工作。现在做会让 M1 失焦。
+看起来蠢，但这就是第一块会"说话"的积木。
 
 ---
 
-## 🎯 M2. 扩展到多 namespace × 多 locale
+### Step 08. 动态拼 `import type` 语句
 
-### 场景
-
-把 fixture 从"1×1"长成"3×3"：
-
-```
-__tests__/fixtures/basic/
-├── base/
-│   ├── common.ts
-│   ├── file.ts
-│   └── user-management.ts        ← 带 kebab-case
-├── en-US/    (3 个同名文件)
-├── zh-CN/    (3 个同名文件)
-└── zh-HK/    (3 个同名文件)
-```
-
-`node scripts/dev-run.mjs`（`locales: ['en-US', 'zh-CN', 'zh-HK']`）应输出：
+改造 `emitResources` 接收扫描结果，并为每个 namespace 拼一行 import：
 
 ```ts
-/* AUTO-GENERATED ... */
-import type { CommonMessage } from '../base/common';
-import type { FileMessage } from '../base/file';
-import type { UserManagementMessage } from '../base/user-management';
+type Namespace = { name: string; typeName: string };
 
-export const defaultNS = 'common' as const;
+export function emitResources(namespaces: Namespace[]) {
+  const imports = namespaces
+    .map((ns) => `import type { ${ns.typeName} } from '../base/${ns.name}';`)
+    .join('\n');
 
-export const resourceNamespaces = {
-  common: {} as CommonMessage,
-  file: {} as FileMessage,
-  'user-management': {} as UserManagementMessage,   // ← 注意加了引号
-} as const;
-
-export type I18nNamespace = keyof typeof resourceNamespaces;
-```
-
-### 为什么现在做这一步
-
-M1 证明了**单元素**情况下整条链路没问题，M2 要暴露"**多元素 + 命名边界情况**"下的问题：
-- `user-management` 要变成 `UserManagementMessage`
-- `'user-management'` 作为 key 要加引号
-- `defaultNS` 的选择策略（字母序第一）
-
-这些都是"**复数化带来的复杂度**"，必须独立一个里程碑隔离出来，不要和 M3/M4 的新功能混着做。
-
-### 这一轮要新建/修改的文件
-
-| 文件 | 动作 | 目的 |
-|---|---|---|
-| `__tests__/fixtures/basic/base/file.ts` + `user-management.ts` | 新建 | 扩展契约 |
-| `__tests__/fixtures/basic/{en-US,zh-CN,zh-HK}/*.ts` | 新建 | 三语言各 3 个文件 |
-| `src/core/types.ts` | 追加 | 新增 `ScannedLocaleFile` 类型 |
-| `src/core/scan-contracts.ts` | 修改 | PascalCase 处理连字符（`user-management` → `UserManagement`） |
-| `src/core/scan-locales-folder.ts` | 填充 | `scanLocalesFolder(config): ScannedLocaleFile[]` |
-| `src/core/emit/resources.ts` | 修改 | kebab-case 的 key 加引号 |
-| `src/core/index.ts` | 修改 | 追加 `scanLocalesFolder` export |
-| `scripts/dev-run.mjs` | 修改 | 传 3 个 locales，也调用 scanLocalesFolder 打印出扫描结果 |
-
-### 关键实现要点
-
-#### PascalCase 正确处理
-```ts
-function toPascalCase(s: string): string {
-  return s.split(/[-_]/).map(w => w[0].toUpperCase() + w.slice(1)).join('');
+  return `${imports}\n\nexport const defaultNS = 'common' as const;\n`;
 }
 ```
 
-#### `emit/resources.ts` 的 key 加引号逻辑
+同时 `dev-run.mjs`：
+
+```js
+console.log(emitResources(namespaces));
+```
+
+✓ 验证：
+
+```bash
+pnpm build && node scripts/dev-run.mjs
+# import type { CommonMessage } from '../base/common';
+# import type { UserManagementMessage } from '../base/user-management';
+#
+# export const defaultNS = 'common' as const;
+```
+
+---
+
+### Step 09. 加 `resourceNamespaces` 对象
+
+```ts
+const entries = namespaces
+  .map((ns) => `  ${ns.name}: {} as ${ns.typeName},`)
+  .join('\n');
+
+const body = `export const resourceNamespaces = {
+${entries}
+} as const;`;
+
+return `${imports}\n\nexport const defaultNS = 'common' as const;\n\n${body}\n`;
+```
+
+✓ 验证输出里应该有：
+
+```ts
+export const resourceNamespaces = {
+  common: {} as CommonMessage,
+  user-management: {} as UserManagementMessage,   // ← 下一步会修这个语法错
+} as const;
+```
+
+发现 `user-management` 作为 JS 标识符是**非法的**——下一步修。
+
+---
+
+### Step 10. 给 kebab-case 的 key 加引号
+
+在 `resources.ts` 顶部加一个小工具：
+
 ```ts
 function formatKey(name: string): string {
   return /^[a-zA-Z_$][\w$]*$/.test(name) ? name : JSON.stringify(name);
 }
-// common            → common
-// user-management   → "user-management"
 ```
 
-#### `scan-locales-folder.ts` 的职责
-- 接收 `config`，对每个 `locale` 读 `path.join(i18nDir, locale)` 目录
-- 返回 `ScannedLocaleFile[]`，每项 `{ locale, namespace, filePath, importPath }`
-- 按 `(locale, namespace)` 双键字母序排序
-- 目前**不抛错**，目录不存在就跳过（M5 再加严）
+把 entries 那行改成：
 
-#### `defaultNS` 策略
-- 字母序第一个 namespace
-- 这一轮够用，未来可以做成 `config.defaultNS` 覆盖
-
-### 完成后你能看到
-
-```bash
-$ pnpm build && node scripts/dev-run.mjs
-/* 你会看到 resources 产物包含 3 个 namespace、kebab-case 加引号 */
-/* 以及 scanLocalesFolder 返回的 9 个文件数组 */
+```ts
+.map((ns) => `  ${formatKey(ns.name)}: {} as ${ns.typeName},`)
 ```
 
-粘到 `/tmp/out.ts` → `tsc --noEmit` 零错误。
-
-### M2 验收清单
-
-| 状态 | 项 |
-|:--:|---|
-| ⬜ | fixture 下 3 ns × 3 locale 共 9 个 locale 文件 + 3 个 base 文件齐全 |
-| ⬜ | `scanContracts` 对 `user-management` 返回 `typeName: 'UserManagementMessage'` |
-| ⬜ | `scanLocalesFolder` 返回 9 项，排序稳定 |
-| ⬜ | `emitResources` 产物里 `'user-management'` 加了引号 |
-| ⬜ | 产物再次经 `tsc --noEmit` 零错误 |
-
-### M2 故意没做的事
-
-- ❌ contracts.ts（下一轮）
-- ❌ runtime.ts / dts.ts
-- ❌ 写盘（还在打印到 console）
-- ❌ 错误抛出（目录缺失暂时跳过）
-- ❌ validate
+✓ 验证：输出里 `'user-management': {} as UserManagementMessage,` 加上引号了。
 
 ---
 
-## 🎯 M3. 契约兜底 —— 让 `tsc` 成为最后的守门员
+### Step 11. 加 `defaultNS` 的推断 + `I18nNamespace` 类型
 
-### 场景
+现在 `defaultNS` 写死了 `'common'`，其实应该取扫描结果的第一个（字母序）。
 
-你希望**首次写文件到磁盘**：生成 `contracts.ts` 到 `__tests__/fixtures/basic/contracts.ts`。
+```ts
+const sorted = [...namespaces].sort((a, b) => a.name.localeCompare(b.name));
+const defaultNSName = sorted[0]?.name ?? 'common';
 
-然后：
+const imports = sorted.map(/* ... */).join('\n');
+const entries = sorted.map(/* ... */).join('\n');
+
+return `${imports}
+
+export const defaultNS = ${JSON.stringify(defaultNSName)} as const;
+
+${body}
+
+export type I18nNamespace = keyof typeof resourceNamespaces;
+`;
+```
+
+✓ 验证：输出尾部多出 `export type I18nNamespace = ...`。
+
+---
+
+### Step 12. 加 AUTOGEN 文件头，丢到 VSCode 里跑 `tsc`
+
+在 `resources.ts` 最顶部加一个常量：
+
+```ts
+const HEADER = `/**
+ * AUTO-GENERATED by i18next-kit — DO NOT EDIT.
+ */
+`;
+```
+
+然后 return 时拼在最前面：
+
+```ts
+return `${HEADER}\n${imports}\n\n...`;
+```
+
+✓ 验证：
 
 ```bash
-cd __tests__/fixtures/basic
-npx tsc --noEmit     # 正常场景：零错误
-
-# 故意删掉一个 locale 文件
-rm zh-CN/common.ts
-npx tsc --noEmit     # 期望：tsc 报错 "Cannot find module './zh-CN/common'"
+pnpm build && node scripts/dev-run.mjs > /tmp/out.ts
+# 把 /tmp/out.ts 拖进 VSCode，看有没有红线
+# 或者：
+cd __tests__/fixtures/basic && cp /tmp/out.ts generated-resources.ts
+npx tsc --noEmit --target ES2022 --moduleResolution Bundler generated-resources.ts
+# 应该零输出
+rm generated-resources.ts
 ```
 
-这就是"**编译期强约束**"的力量——`contracts.ts` 把所有实现层的文件显式 import 一遍，TS 会替我们兜住"某 locale 漏翻"的情况。
+零错误 = 你的 emit 产物已经是**合法可编译的 TypeScript**。🎉
 
-### 为什么现在做这一步
+---
 
-M1/M2 的产物只在终端打印，脱离了"文件系统"。真实使用场景里 core 要**写文件**，并且要保证：
-1. 幂等：同样输入两次写入内容一致
-2. 原子：不会写一半被 Vite 读到
-3. 可验证：写出的文件能被 tsc 吃掉
+### 🏁 M2 单元测试：锁住 `emitResources` 的 snapshot
 
-M3 把"写盘"能力引入，并用 `contracts.ts` 这个**最能证明价值**的产物来验证整条链路。
-
-### 这一轮要新建/修改的文件
-
-| 文件 | 动作 | 目的 |
-|---|---|---|
-| `src/core/emit/contracts.ts` | 新建 | `emitContracts(ns, loc, config): string` |
-| `src/core/emit/index.ts` | 修改 | 追加 export |
-| `src/core/write.ts` | 新建 | `writeAtomic(filePath, content): Promise<boolean>` 返回是否有变化 |
-| `src/core/index.ts` | 修改 | 追加 export |
-| `scripts/dev-run.mjs` | 修改 | 调用 `emitContracts` 并 `writeAtomic` 到 `outDir` |
-| `__tests__/fixtures/basic/tsconfig.json` | 新建 | fixture 自己能被 tsc 单独编译 |
-
-### 关键实现要点
-
-#### `emit/contracts.ts` 的产物样例
+新建 `src/core/emit/resources.test.ts`：
 
 ```ts
-/* AUTO-GENERATED ... */
-import type { CommonMessage } from './base/common';
-import type { FileMessage } from './base/file';
-import type { UserManagementMessage } from './base/user-management';
+import { describe, expect, it } from 'vitest';
+import { emitResources } from './resources';
 
-import enUSCommon from './en-US/common';
-import enUSFile from './en-US/file';
-import enUSUserManagement from './en-US/user-management';
-import zhCNCommon from './zh-CN/common';
-/* ... */
+describe('emitResources', () => {
+  it('一个 namespace 时输出正确结构', () => {
+    const out = emitResources([{ name: 'common', typeName: 'CommonMessage' }]);
+    expect(out).toMatchInlineSnapshot();
+    // 首次运行 vitest 会自动填入 snapshot，review 时肉眼确认即可
+  });
 
-type LocaleContract = {
-  common: CommonMessage;
-  file: FileMessage;
-  'user-management': UserManagementMessage;
-};
+  it('kebab-case 的 key 会加引号', () => {
+    const out = emitResources([
+      { name: 'common', typeName: 'CommonMessage' },
+      { name: 'user-management', typeName: 'UserManagementMessage' },
+    ]);
+    expect(out).toContain(`'user-management': {} as UserManagementMessage,`);
+    expect(out).toContain('common: {} as CommonMessage,');
+  });
 
-export const contracts = {
-  'en-US': {
-    common: enUSCommon,
-    file: enUSFile,
-    'user-management': enUSUserManagement,
-  },
-  'zh-CN': { /* ... */ },
-  'zh-HK': { /* ... */ },
-} satisfies Record<'en-US' | 'zh-CN' | 'zh-HK', LocaleContract>;
+  it('defaultNS 取字母序第一', () => {
+    const out = emitResources([
+      { name: 'zulu', typeName: 'ZuluMessage' },
+      { name: 'alpha', typeName: 'AlphaMessage' },
+    ]);
+    expect(out).toContain(`export const defaultNS = 'alpha' as const`);
+  });
+
+  it('产物包含 AUTO-GENERATED 头', () => {
+    const out = emitResources([{ name: 'x', typeName: 'XMessage' }]);
+    expect(out.startsWith('/**\n * AUTO-GENERATED')).toBe(true);
+  });
+});
 ```
 
-命名约定：`${camelCase(locale)}${PascalCase(namespace)}`
-- `en-US` + `common` → `enUSCommon`
-- `zh-CN` + `user-management` → `zhCNUserManagement`
+✓ 验证：`pnpm test` 全绿。
 
-#### `writeAtomic` 的实现（≤ 20 行）
+---
+
+## 🏁 M3. 让它真的写文件
+
+**这一轮结束时你拥有的东西**：产物不再是 `console.log`，而是真的落到 fixture 目录里；内容一致时跳过写入；fixture 下 `tsc --noEmit` 通过。
+
+---
+
+### Step 13. 第一次用 `fs.writeFile` 落盘
+
+在 `dev-run.mjs` 里：
+
+```js
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+const outDir = './__tests__/fixtures/basic';
+const namespaces = scanContracts(join(outDir, 'base'));
+writeFileSync(join(outDir, 'generated-resources.ts'), emitResources(namespaces));
+console.log('✓ wrote generated-resources.ts');
+```
+
+✓ 验证：
+
+```bash
+pnpm build && node scripts/dev-run.mjs
+# ✓ wrote generated-resources.ts
+ls __tests__/fixtures/basic/generated-resources.ts   # 存在
+```
+
+---
+
+### Step 14. 抽出 `writeIfChanged`，加幂等
+
+新建 `src/core/write.ts`：
 
 ```ts
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { readFileSync, writeFileSync } from 'node:fs';
 
-export async function writeAtomic(
-  filePath: string,
-  content: string,
-): Promise<boolean> {
+export function writeIfChanged(path: string, content: string): boolean {
   try {
-    const old = await readFile(filePath, 'utf8');
-    if (old === content) return false;   // 幂等：内容一致不写
-  } catch { /* 文件不存在，下面写入 */ }
-
-  await mkdir(dirname(filePath), { recursive: true });
-  const tmp = filePath + '.tmp';
-  await writeFile(tmp, content, 'utf8');
-  await rename(tmp, filePath);
+    if (readFileSync(path, 'utf8') === content) {
+      return false;
+    }
+  } catch {
+    // 文件不存在，下面写入
+  }
+  writeFileSync(path, content, 'utf8');
   return true;
 }
 ```
 
-返回 `boolean` 让上层知道"这次是否真的写了"，后面 Phase 2 的 HMR 通知会用到。
+在 `src/core/index.ts` 补 export，然后 `dev-run.mjs` 改用它：
 
-#### fixture 的 `tsconfig.json`
-给 fixture 一个独立的 tsconfig 让 `tsc --noEmit` 能独立运行：
+```js
+const changed = writeIfChanged(
+  join(outDir, 'generated-resources.ts'),
+  emitResources(namespaces),
+);
+console.log(changed ? '✓ wrote generated-resources.ts' : '· skipped (no change)');
+```
+
+✓ 验证：
+
+```bash
+pnpm build && node scripts/dev-run.mjs
+# ✓ wrote generated-resources.ts
+pnpm build && node scripts/dev-run.mjs
+# · skipped (no change)     ← 第二次没变化就不写
+```
+
+---
+
+### Step 15. 升级为原子写（先写 `.tmp` 再 `rename`）
+
+避免 Vite HMR 在文件写一半时读到。
+
+```ts
+import { readFileSync, renameSync, writeFileSync } from 'node:fs';
+
+export function writeIfChanged(path: string, content: string): boolean {
+  try {
+    if (readFileSync(path, 'utf8') === content) return false;
+  } catch {
+    /* noop */
+  }
+  const tmp = `${path}.tmp`;
+  writeFileSync(tmp, content, 'utf8');
+  renameSync(tmp, path);
+  return true;
+}
+```
+
+✓ 验证：再跑一次 `dev-run.mjs`，行为不变。
+
+---
+
+### Step 16. 给 fixture 一个自己的 `tsconfig.json`
+
+新建 `__tests__/fixtures/basic/tsconfig.json`：
+
 ```json
 {
   "compilerOptions": {
@@ -459,105 +568,379 @@ export async function writeAtomic(
     "moduleResolution": "Bundler",
     "strict": true,
     "skipLibCheck": true,
-    "noEmit": true
+    "noEmit": true,
+    "isolatedModules": true
   },
-  "include": ["**/*.ts"]
+  "include": ["**/*.ts", "**/*.tsx"]
 }
 ```
 
-### 完成后你能看到
+同时在 fixture 的 `en-US/` 下补一个对应文件（保持 contracts 一致）：
 
 ```bash
-$ pnpm build && node scripts/dev-run.mjs
-✓ wrote __tests__/fixtures/basic/generated-resources.ts
-✓ wrote __tests__/fixtures/basic/contracts.ts
-
-$ cd __tests__/fixtures/basic && npx tsc --noEmit
-# 零输出，零错误
-
-# 故意删 zh-CN/common.ts
-$ rm zh-CN/common.ts
-$ npx tsc --noEmit
-# contracts.ts:10:19 - error TS2307: Cannot find module './zh-CN/common'
-
-# 还原
-$ git checkout zh-CN/common.ts && npx tsc --noEmit   # 又绿
+mkdir -p __tests__/fixtures/basic/en-US
+cat > __tests__/fixtures/basic/en-US/common.ts <<'EOF'
+import type { CommonMessage } from '../base/common';
+const common: CommonMessage = { hello: 'Hello' };
+export default common;
+EOF
+cat > __tests__/fixtures/basic/en-US/user-management.ts <<'EOF'
+import type { UserManagementMessage } from '../base/user-management';
+const userManagement: UserManagementMessage = { title: 'User Management' };
+export default userManagement;
+EOF
 ```
 
-**这是 Phase 1 第一次让 "编译期强约束" 真的发挥作用，值得仪式感地截个图。**
+✓ 验证：
 
-### M3 验收清单
+```bash
+cd __tests__/fixtures/basic && npx tsc --noEmit
+# 零错误
+cd ../../..
+```
 
-| 状态 | 项 |
-|:--:|---|
-| ⬜ | fixture 下出现 `generated-resources.ts` 和 `contracts.ts` |
-| ⬜ | `tsc --noEmit` 在 fixture 目录零错误 |
-| ⬜ | 删除任一 locale 文件 → tsc 报 `Cannot find module` |
-| ⬜ | 第二次 `node scripts/dev-run.mjs` → `writeAtomic` 返回 false（内容一致，跳过写） |
-| ⬜ | 文件头第一行是 `/**AUTO-GENERATED...` 注释 |
-
-### M3 故意没做的事
-
-- ❌ `generated-runtime.ts`（下一轮）
-- ❌ `i18next.d.ts`
-- ❌ validate —— 现在依靠 tsc 报错，validate 留给 M5 做"更友好的报告"
-- ❌ 单测
+（如果你的主仓库 `tsconfig.json` 的 `exclude` 里还没有这个目录，记得加上 `"__tests__/fixtures"`，避免主仓库 tsc 被 fixture 代码干扰。）
 
 ---
 
-## 🎯 M4. 接入 i18next 运行时 —— 让 `t('hello')` 有补全
+### Step 17. 把 fixture 扩展到 3 × 3
 
-### 场景
+为 M4 做准备，把实现层补全：
 
-你希望在 fixture 里加一个 `App.tsx`：
+```bash
+for locale in zh-CN zh-HK; do
+  mkdir -p __tests__/fixtures/basic/$locale
+  cat > __tests__/fixtures/basic/$locale/common.ts <<EOF
+import type { CommonMessage } from '../base/common';
+const common: CommonMessage = { hello: 'Hello' };
+export default common;
+EOF
+  cat > __tests__/fixtures/basic/$locale/user-management.ts <<EOF
+import type { UserManagementMessage } from '../base/user-management';
+const userManagement: UserManagementMessage = { title: 'User Management' };
+export default userManagement;
+EOF
+done
+```
 
-```tsx
-// __tests__/fixtures/basic/App.tsx
-import { useTranslation } from 'react-i18next';
-import './i18next';   // 让 declare module 生效
+✓ 验证：
 
-export function App() {
-  const { t } = useTranslation('common');
-  return <h1>{t('hello')}</h1>;   // ← hover 有类型、改成 t('xxx') 会红线
+```bash
+cd __tests__/fixtures/basic && npx tsc --noEmit
+# 零错误
+```
+
+---
+
+### 🏁 M3 单元测试：锁住 `writeIfChanged` 的行为
+
+新建 `src/core/write.test.ts`：
+
+```ts
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
+import { writeIfChanged } from './write';
+
+function tmpFile() {
+  const dir = mkdtempSync(join(tmpdir(), 'i18next-kit-write-'));
+  return join(dir, 'target.ts');
+}
+
+describe('writeIfChanged', () => {
+  it('文件不存在时写入并返回 true', () => {
+    const p = tmpFile();
+    expect(writeIfChanged(p, 'hello')).toBe(true);
+    expect(readFileSync(p, 'utf8')).toBe('hello');
+  });
+
+  it('内容一致时跳过并返回 false', () => {
+    const p = tmpFile();
+    writeFileSync(p, 'hello');
+    expect(writeIfChanged(p, 'hello')).toBe(false);
+  });
+
+  it('内容变化时覆盖并返回 true', () => {
+    const p = tmpFile();
+    writeFileSync(p, 'hello');
+    expect(writeIfChanged(p, 'world')).toBe(true);
+    expect(readFileSync(p, 'utf8')).toBe('world');
+  });
+});
+```
+
+✓ 验证：`pnpm test` 全绿。
+
+---
+
+## 🏁 M4. 让 `tsc` 成为守门员
+
+**这一轮结束时你拥有的东西**：生成的 `contracts.ts` 把每个 locale 的 namespace 都 `import`+`satisfies` 一遍。**你故意删任何一个 locale 文件 → `tsc` 立刻报错**。
+
+这是整个 Phase 1 最有成就感的时刻，建议完成后截图留念。
+
+---
+
+### Step 18. 写 `scanLocalesFolder`
+
+新建 `src/core/scan-locales-folder.ts`：
+
+```ts
+import { readdirSync } from 'node:fs';
+import { join } from 'node:path';
+
+export function scanLocalesFolder(i18nDir: string, locales: string[]) {
+  const result = [];
+  for (const locale of locales) {
+    const dir = join(i18nDir, locale);
+    const files = readdirSync(dir)
+      .filter((f) => f.endsWith('.ts') && !f.endsWith('.d.ts'))
+      .map((f) => f.replace(/\.ts$/, ''));
+    for (const namespace of files) {
+      result.push({ locale, namespace });
+    }
+  }
+  return result;
 }
 ```
 
-`npx tsc --noEmit` 仍然零错误，且 IDE 里 `t(` 之后 `Ctrl+Space` 能看到 `'hello'` 补全。
+`src/core/index.ts` 补 export。
 
-### 为什么现在做这一步
+在 `dev-run.mjs` 里调一下看结果：
 
-M3 让 contracts.ts 保证了"**用户写的 locale 实现**"在编译期对齐，但用户在组件里调 `t('xxx')` 还是 any。M4 把另一半补上：
-- `generated-runtime.ts`：运行时初始化，让浏览器真能跑出 "Hello"
-- `i18next.d.ts`：类型注入，让 IDE 给 `t()` 智能补全
+```js
+import { scanLocalesFolder } from '../dist/core/index.js';
+console.log(scanLocalesFolder(outDir, ['en-US', 'zh-CN', 'zh-HK']));
+```
 
-完成后 core 的 4 大产物就齐了，Phase 1 的"**能力完整度**"达到 100%。
+✓ 验证：
 
-### 这一轮要新建/修改的文件
+```bash
+pnpm build && node scripts/dev-run.mjs
+# 应打印 6 项（3 locales × 2 namespaces）
+```
 
-| 文件 | 动作 | 目的 |
-|---|---|---|
-| `src/core/emit/runtime.ts` | 新建 | `emitRuntime(config): string` |
-| `src/core/emit/dts.ts` | 新建 | `emitDts(config): string` |
-| `src/core/emit/index.ts` | 修改 | 追加 export |
-| `src/core/index.ts` | 修改 | 追加 export |
-| `scripts/dev-run.mjs` | 修改 | 串入这两个产物 |
-| `__tests__/fixtures/basic/App.tsx` | 新建 | 验证 IDE 补全 |
+---
 
-### 关键实现要点
+### Step 19. 写 `emitContracts`
 
-#### `emit/runtime.ts` 产物样例（eager 版本）
+新建 `src/core/emit/contracts.ts`。产物最终应长这样：
+
+```ts
+/**
+ * AUTO-GENERATED by i18next-kit — DO NOT EDIT.
+ */
+import type { CommonMessage } from './base/common';
+import type { UserManagementMessage } from './base/user-management';
+
+import enUSCommon from './en-US/common';
+import enUSUserManagement from './en-US/user-management';
+import zhCNCommon from './zh-CN/common';
+/* ... */
+
+type LocaleContract = {
+  common: CommonMessage;
+  'user-management': UserManagementMessage;
+};
+
+export const contracts = {
+  'en-US': { common: enUSCommon, 'user-management': enUSUserManagement },
+  'zh-CN': { /* ... */ },
+  'zh-HK': { /* ... */ },
+} satisfies Record<'en-US' | 'zh-CN' | 'zh-HK', LocaleContract>;
+```
+
+实现思路（建议自己敲一遍，不要直接拷）：
+
+```ts
+type Namespace = { name: string; typeName: string };
+type LocaleFile = { locale: string; namespace: string };
+
+function toCamelLocale(locale: string): string {
+  // 'en-US' → 'enUS'
+  return locale
+    .split('-')
+    .map((part, i) =>
+      i === 0 ? part : part.charAt(0).toUpperCase() + part.slice(1),
+    )
+    .join('');
+}
+
+function toPascal(name: string): string {
+  return name
+    .split(/[-_]/)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join('');
+}
+
+function formatKey(name: string): string {
+  return /^[a-zA-Z_$][\w$]*$/.test(name) ? name : JSON.stringify(name);
+}
+
+export function emitContracts(
+  namespaces: Namespace[],
+  localeFiles: LocaleFile[],
+  locales: string[],
+) {
+  // imports type
+  // imports value
+  // LocaleContract type
+  // contracts object
+  // satisfies Record<...>
+  // 拼出来 return 即可
+}
+```
+
+把拼字符串拆成 5 段变量然后 join，可读性最好。
+
+---
+
+### Step 20. 把 `contracts.ts` 也生成出来
+
+`dev-run.mjs` 里加：
+
+```js
+import { emitContracts } from '../dist/core/index.js';
+
+const localeFiles = scanLocalesFolder(outDir, ['en-US', 'zh-CN', 'zh-HK']);
+writeIfChanged(
+  join(outDir, 'contracts.ts'),
+  emitContracts(namespaces, localeFiles, ['en-US', 'zh-CN', 'zh-HK']),
+);
+```
+
+✓ 验证：
+
+```bash
+pnpm build && node scripts/dev-run.mjs
+ls __tests__/fixtures/basic/contracts.ts   # 存在
+
+cd __tests__/fixtures/basic && npx tsc --noEmit
+# 零错误
+cd ../../..
+```
+
+---
+
+### Step 21. 故意删一个 locale 文件，看 tsc 爆炸
+
+```bash
+rm __tests__/fixtures/basic/zh-CN/common.ts
+cd __tests__/fixtures/basic && npx tsc --noEmit
+# contracts.ts:xx:19 - error TS2307: Cannot find module './zh-CN/common'
+cd ../../..
+```
+
+✓ 看到这个错误就成功了。契约兜底正式生效。
+
+---
+
+### Step 22. 恢复文件
+
+```bash
+cat > __tests__/fixtures/basic/zh-CN/common.ts <<'EOF'
+import type { CommonMessage } from '../base/common';
+const common: CommonMessage = { hello: 'Hello' };
+export default common;
+EOF
+
+cd __tests__/fixtures/basic && npx tsc --noEmit   # 又绿了
+cd ../../..
+```
+
+---
+
+### 🏁 M4 单元测试：锁住 `scanLocalesFolder` 和 `emitContracts`
+
+新建 `src/core/scan-locales-folder.test.ts` 和 `src/core/emit/contracts.test.ts`：
+
+```ts
+// scan-locales-folder.test.ts
+import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
+import { scanLocalesFolder } from './scan-locales-folder';
+
+describe('scanLocalesFolder', () => {
+  it('遍历每个 locale 目录返回 (locale, namespace) 对', () => {
+    const root = mkdtempSync(join(tmpdir(), 'i18n-'));
+    for (const locale of ['en-US', 'zh-CN']) {
+      mkdirSync(join(root, locale));
+      writeFileSync(join(root, locale, 'common.ts'), '');
+      writeFileSync(join(root, locale, 'file.ts'), '');
+    }
+
+    expect(scanLocalesFolder(root, ['en-US', 'zh-CN'])).toEqual(
+      expect.arrayContaining([
+        { locale: 'en-US', namespace: 'common' },
+        { locale: 'en-US', namespace: 'file' },
+        { locale: 'zh-CN', namespace: 'common' },
+        { locale: 'zh-CN', namespace: 'file' },
+      ]),
+    );
+  });
+});
+```
+
+```ts
+// emit/contracts.test.ts
+import { describe, expect, it } from 'vitest';
+import { emitContracts } from './contracts';
+
+describe('emitContracts', () => {
+  it('产物包含每个 (locale, namespace) 的 value import', () => {
+    const out = emitContracts(
+      [
+        { name: 'common', typeName: 'CommonMessage' },
+        { name: 'user-management', typeName: 'UserManagementMessage' },
+      ],
+      [
+        { locale: 'en-US', namespace: 'common' },
+        { locale: 'en-US', namespace: 'user-management' },
+        { locale: 'zh-CN', namespace: 'common' },
+        { locale: 'zh-CN', namespace: 'user-management' },
+      ],
+      ['en-US', 'zh-CN'],
+    );
+
+    expect(out).toContain(`import enUSCommon from './en-US/common';`);
+    expect(out).toContain(`import zhCNUserManagement from './zh-CN/user-management';`);
+    expect(out).toContain(`satisfies Record<'en-US' | 'zh-CN', LocaleContract>`);
+    expect(out).toContain(`'user-management': UserManagementMessage`);
+  });
+});
+```
+
+✓ 验证：`pnpm test` 全绿。
+
+---
+
+## 🏁 M5. 让 `t('hello')` 有补全
+
+**这一轮结束时你拥有的东西**：fixture 下能跑的 React 组件，IDE 对 `t('hello')` 有补全、对 `t('xxx')` 有红线。4 个核心产物齐全。
+
+---
+
+### Step 23. 写 `emitRuntime`（eager 版本）
+
+新建 `src/core/emit/runtime.ts`，产物最终长这样：
 
 ```ts
 /* AUTO-GENERATED ... */
-import i18n, { type InitOptions, type Resource, type ResourceKey } from 'i18next';
+import i18n, {
+  type InitOptions,
+  type Resource,
+  type ResourceKey,
+} from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import { defaultNS, resourceNamespaces } from './generated-resources';
 
-// 参与编译期契约校验，运行时无副作用
 import './contracts';
 
 const modules: Record<string, unknown> = import.meta.glob(
-  './{en-US,zh-CN,zh-HK}/*.ts',     // ← locale 列表按 config 动态拼
+  './{en-US,zh-CN,zh-HK}/*.ts',
   { eager: true },
 );
 
@@ -571,7 +954,9 @@ for (const p in modules) {
   (resources[locale] as Record<string, ResourceKey>)[ns] = mod.default;
 }
 
-export function initI18n(options?: Omit<InitOptions, 'resources' | 'defaultNS' | 'ns'>) {
+export function initI18n(
+  options?: Omit<InitOptions, 'resources' | 'defaultNS' | 'ns'>,
+) {
   return i18n.use(initReactI18next).init({
     resources,
     defaultNS,
@@ -583,12 +968,36 @@ export function initI18n(options?: Omit<InitOptions, 'resources' | 'defaultNS' |
 }
 ```
 
-动态部分：glob pattern 的 `{en-US,zh-CN,zh-HK}`、正则的 `(en-US|zh-CN|zh-HK)`、`resources` 初始化对象——全部由 `config.locales` 生成。
+动态部分（3 处）由 `locales` 数组拼：
 
-#### `emit/dts.ts` 产物样例（几乎固定）
+- `./{en-US,zh-CN,zh-HK}/*.ts`
+- `(en-US|zh-CN|zh-HK)` 正则
+- `resources` 对象的初始 key
+
+实现：
 
 ```ts
-/* AUTO-GENERATED ... */
+export function emitRuntime(locales: string[]) {
+  const globPattern = `./{${locales.join(',')}}/*.ts`;
+  const alternation = locales.join('|');
+  const initialResources = locales
+    .map((l) => `'${l}': {}`)
+    .join(', ');
+  // 拼出产物返回
+}
+```
+
+---
+
+### Step 24. 写 `emitDts`
+
+新建 `src/core/emit/dts.ts`，内容几乎固定：
+
+```ts
+export function emitDts() {
+  return `/**
+ * AUTO-GENERATED by i18next-kit — DO NOT EDIT.
+ */
 import 'i18next';
 import type { defaultNS, resourceNamespaces } from './generated-resources';
 
@@ -600,97 +1009,138 @@ declare module 'i18next' {
 }
 
 export {};
+`;
+}
 ```
-
-### 完成后你能看到
-
-```bash
-$ pnpm build && node scripts/dev-run.mjs
-✓ wrote .../generated-resources.ts
-✓ wrote .../contracts.ts
-✓ wrote .../generated-runtime.ts
-✓ wrote .../i18next.d.ts
-```
-
-在 VSCode 里打开 `__tests__/fixtures/basic/App.tsx`：
-- 光标在 `t(` 之后按 `Ctrl+Space` → 弹出 `'hello'` 候选
-- 改成 `t('xxx')` → 红色下划线 `Argument of type '"xxx"' is not assignable...`
-- `useTranslation('common' | 'file' | 'user-management')` 能看到 namespace 提示
-
-### M4 验收清单
-
-| 状态 | 项 |
-|:--:|---|
-| ⬜ | fixture 下 4 个产物都齐 |
-| ⬜ | `tsc --noEmit` 在 fixture 根下零错误 |
-| ⬜ | `App.tsx` 里 `t('hello')` IDE 有补全 |
-| ⬜ | `App.tsx` 里 `t('xxx')` IDE 有红线 |
-| ⬜ | `useTranslation('invalid-ns')` 红线 |
-
-### M4 故意没做的事
-
-- ❌ 懒加载 runtime（Phase 3）
-- ❌ `mode: 'file'`（Phase 3）
-- ❌ 自定义 `defaultNS`
-- ❌ validate
 
 ---
 
-## 🎯 M5. 校验与错误分类 —— 坏数据要有清晰报告
+### Step 25. 串起来生成 4 个文件
 
-### 场景
+`dev-run.mjs`：
 
-故意制造 4 种"坏"场景，期望**每种都有分级报告**：
+```js
+import {
+  scanContracts,
+  scanLocalesFolder,
+  emitResources,
+  emitContracts,
+  emitRuntime,
+  emitDts,
+  writeIfChanged,
+} from '../dist/core/index.js';
 
-```bash
-# 场景 A：contracts 目录不存在
-rm -rf __tests__/fixtures/basic/base
-node scripts/dev-run.mjs
-# 期望：红色错误 [CONTRACTS_DIR_NOT_FOUND] /abs/path/base 不存在
-#       进程退出非 0
+const outDir = './__tests__/fixtures/basic';
+const locales = ['en-US', 'zh-CN', 'zh-HK'];
+const namespaces = scanContracts(`${outDir}/base`);
+const localeFiles = scanLocalesFolder(outDir, locales);
 
-# 场景 B：某 locale 目录不存在
-rm -rf __tests__/fixtures/basic/zh-HK
-# 期望：红色错误 [LOCALE_DIR_NOT_FOUND] /abs/path/zh-HK 不存在
-
-# 场景 C：某 locale 缺了个 namespace 文件
-rm __tests__/fixtures/basic/zh-CN/common.ts
-# 期望：黄色警告 [MISSING_LOCALE_FILE] zh-CN × common 应在 /abs/path/zh-CN/common.ts
-#       进程可以继续（Vite dev 模式下不阻塞；CLI generate 会退出非 0）
-
-# 场景 D：用户传了 locales: []
-# 期望：红色错误 [INVALID_CONFIG] locales 不能为空
+for (const [file, content] of [
+  ['generated-resources.ts', emitResources(namespaces)],
+  ['contracts.ts', emitContracts(namespaces, localeFiles, locales)],
+  ['generated-runtime.ts', emitRuntime(locales)],
+  ['i18next.d.ts', emitDts()],
+]) {
+  const changed = writeIfChanged(`${outDir}/${file}`, content);
+  console.log(changed ? `✓ wrote ${file}` : `· skipped ${file}`);
+}
 ```
 
-### 为什么现在做这一步
+✓ 验证：
 
-M1~M4 的"主干链路"跑通了，但 happy path only。真实用户项目一定会遇到各种畸形状态。
-Phase 2 的 plugin 要在浏览器 overlay 里显示错误、CLI 要彩色打印，**都依赖 core 先把错误体系设计好**。
-现在不做，M6 的 `generateAll` 就没法优雅串 error handling。
+```bash
+pnpm build && node scripts/dev-run.mjs
+# ✓ 4 个文件
+cd __tests__/fixtures/basic && npx tsc --noEmit   # 零错误
+cd ../../..
+```
 
-### 这一轮要新建/修改的文件
+---
 
-| 文件 | 动作 | 目的 |
-|---|---|---|
-| `src/core/types.ts` | 追加 | `I18nextKitError` class + 所有 error code 枚举 + `ValidationIssue` / `ValidationReport` |
-| `src/core/scan-contracts.ts` | 修改 | 目录不存在/空 → 抛 `I18nextKitError` |
-| `src/core/scan-locales-folder.ts` | 修改 | 目录不存在 → 抛 |
-| `src/core/validate.ts` | 填充 | `validate(ns, loc, config): ValidationReport` 不抛，返回报告 |
-| `src/core/index.ts` | 修改 | 追加 export |
-| `scripts/dev-run.mjs` | 修改 | 包 try/catch，用 `picocolors` 彩色输出 |
+### Step 26. fixture 写一个假的 `App.tsx` 看 IDE 补全
 
-### 关键实现要点
+```bash
+cat > __tests__/fixtures/basic/App.tsx <<'EOF'
+import { useTranslation } from 'react-i18next';
+import './i18next';  // 让 declare module 生效
 
-#### 错误体系设计
+export function App() {
+  const { t } = useTranslation('common');
+  return <h1>{t('hello')}</h1>;
+}
+EOF
+```
+
+✓ 验证：
+- 在 VSCode 打开 `App.tsx`
+- 光标放 `t(` 后按 `Ctrl+Space` → 看到 `'hello'` 候选
+- 改成 `t('xxx')` → 红线
+- `useTranslation('invalid')` → 红线
+
+---
+
+### 🏁 M5 单元测试：锁住 `emitRuntime` 和 `emitDts`
+
+新建 `src/core/emit/runtime.test.ts` 和 `src/core/emit/dts.test.ts`：
+
+```ts
+// runtime.test.ts
+import { describe, expect, it } from 'vitest';
+import { emitRuntime } from './runtime';
+
+describe('emitRuntime', () => {
+  it('glob pattern 包含所有 locale', () => {
+    const out = emitRuntime(['en-US', 'zh-CN']);
+    expect(out).toContain(`import.meta.glob(\n  './{en-US,zh-CN}/*.ts'`);
+  });
+
+  it('正则里的 alternation 覆盖所有 locale', () => {
+    const out = emitRuntime(['en-US', 'zh-CN']);
+    expect(out).toContain(`match(/^\\.\\/(en-US|zh-CN)\\/(.+)\\.ts$/)`);
+  });
+
+  it('resources 初始化对象包含每个 locale', () => {
+    const out = emitRuntime(['en-US', 'zh-CN']);
+    expect(out).toMatch(/const resources: Resource = \{\s*'en-US': \{\}, 'zh-CN': \{\}/);
+  });
+});
+```
+
+```ts
+// dts.test.ts
+import { describe, expect, it } from 'vitest';
+import { emitDts } from './dts';
+
+describe('emitDts', () => {
+  it('产物包含 declare module 扩展', () => {
+    const out = emitDts();
+    expect(out).toContain(`declare module 'i18next'`);
+    expect(out).toContain(`defaultNS: typeof defaultNS`);
+    expect(out).toContain(`resources: typeof resourceNamespaces`);
+  });
+});
+```
+
+✓ 验证：`pnpm test` 全绿。
+
+---
+
+## 🏁 M6. 让错误说人话
+
+**这一轮结束时你拥有的东西**：目录不存在、空目录、缺 locale 文件等场景会被清晰分类为"致命错误"和"校验警告"，终端有彩色输出。
+
+---
+
+### Step 27. 引入 `I18nextKitError`，让 `scanContracts` 在目录不存在时抛
+
+在 `src/core/types.ts` 里（之前一直没用，现在第一次正式用上）：
 
 ```ts
 export type I18nextKitErrorCode =
   | 'CONTRACTS_DIR_NOT_FOUND'
-  | 'LOCALE_DIR_NOT_FOUND'
   | 'EMPTY_CONTRACTS'
+  | 'LOCALE_DIR_NOT_FOUND'
   | 'INVALID_CONFIG';
-  // 注意：MISSING_LOCALE_FILE / EXTRA_LOCALE_FILE 是 validate issue
-  // 不是致命 error，不在这个 union 里
 
 export class I18nextKitError extends Error {
   constructor(
@@ -704,306 +1154,498 @@ export class I18nextKitError extends Error {
 }
 ```
 
-#### 错误 vs 警告的哲学
+`src/core/index.ts` 补 export。
 
-| 类型 | 何时触发 | 谁决定致命性 | 示例 |
-|---|---|---|---|
-| **I18nextKitError** (抛) | scanner 级别，**数据结构不完整无法继续** | scanner | 目录不存在、base 为空 |
-| **ValidationIssue** (返回) | validate 级别，**数据结构完整但不对齐** | 上层决策（plugin/CLI） | 缺 locale 文件、多余文件 |
-
-这个分层让 plugin 可以"**遇到 I18nextKitError 直接阻塞，遇到 ValidationIssue 只弹 overlay 不阻塞**"。
-
-#### `validate.ts` 签名
+修改 `scan-contracts.ts`：
 
 ```ts
-export interface ValidationIssue {
+import { existsSync } from 'node:fs';
+import { I18nextKitError } from './types';
+
+export function scanContracts(dir: string) {
+  if (!existsSync(dir)) {
+    throw new I18nextKitError(
+      'CONTRACTS_DIR_NOT_FOUND',
+      `契约目录不存在: ${dir}`,
+      { dir },
+    );
+  }
+  // ... 原有逻辑
+}
+```
+
+✓ 验证：在 `dev-run.mjs` 里临时改个不存在的路径，应该看到：
+
+```
+I18nextKitError: [CONTRACTS_DIR_NOT_FOUND] 契约目录不存在: ./not-exists
+```
+
+---
+
+### Step 28. `EMPTY_CONTRACTS` 错误
+
+在 `scan-contracts.ts` 里：
+
+```ts
+const result = readdirSync(dir)
+  .filter(/* ... */)
+  .map(/* ... */);
+
+if (result.length === 0) {
+  throw new I18nextKitError(
+    'EMPTY_CONTRACTS',
+    `契约目录为空: ${dir}`,
+    { dir },
+  );
+}
+
+return result;
+```
+
+✓ 验证：临时清空 `base/` 试一下。
+
+---
+
+### Step 29. `LOCALE_DIR_NOT_FOUND` 错误
+
+在 `scan-locales-folder.ts` 里加 `existsSync` 检查并抛 `LOCALE_DIR_NOT_FOUND`。
+
+---
+
+### Step 30. 写 `validate` + `dev-run.mjs` 用 picocolors 彩色打印
+
+新建 `src/core/validate.ts`：
+
+```ts
+export type ValidationIssue = {
   code: 'MISSING_LOCALE_FILE' | 'EXTRA_LOCALE_FILE';
   locale: string;
   namespace: string;
-  expectedPath?: string;
-  actualPath?: string;
-}
+};
 
-export interface ValidationReport {
+export type ValidationReport = {
   ok: boolean;
   issues: ValidationIssue[];
-}
+};
+
+type Namespace = { name: string };
+type LocaleFile = { locale: string; namespace: string };
 
 export function validate(
-  namespaces: ScannedNamespace[],
-  locales: ScannedLocaleFile[],
-  config: ResolvedConfig,
-): ValidationReport;
-```
+  namespaces: Namespace[],
+  localeFiles: LocaleFile[],
+  locales: string[],
+): ValidationReport {
+  const issues: ValidationIssue[] = [];
+  const have = new Set(localeFiles.map((f) => `${f.locale}::${f.namespace}`));
+  const expected = new Set<string>();
 
-对 `namespaces × config.locales` 做笛卡尔积，逐一核对。
-
-#### `dev-run.mjs` 的错误输出样例
-
-```js
-import pc from 'picocolors';
-
-try {
-  const namespaces = scanContracts(config);
-  const locales = scanLocalesFolder(config);
-  const report = validate(namespaces, locales, config);
-
-  if (!report.ok) {
-    for (const issue of report.issues) {
-      console.warn(pc.yellow(`⚠ [${issue.code}] ${issue.locale} × ${issue.namespace}`));
-      if (issue.expectedPath) console.warn(pc.dim(`    expected: ${issue.expectedPath}`));
+  for (const l of locales) {
+    for (const ns of namespaces) {
+      const key = `${l}::${ns.name}`;
+      expected.add(key);
+      if (!have.has(key)) {
+        issues.push({ code: 'MISSING_LOCALE_FILE', locale: l, namespace: ns.name });
+      }
     }
   }
 
-  // 继续生成 ...
+  for (const f of localeFiles) {
+    const key = `${f.locale}::${f.namespace}`;
+    if (!expected.has(key)) {
+      issues.push({ code: 'EXTRA_LOCALE_FILE', ...f });
+    }
+  }
+
+  return { ok: issues.length === 0, issues };
+}
+```
+
+`dev-run.mjs` 包 try/catch + 彩色输出：
+
+```js
+import pc from 'picocolors';
+import { I18nextKitError, validate } from '../dist/core/index.js';
+
+try {
+  // ...原有扫描逻辑
+  const report = validate(namespaces, localeFiles, locales);
+  if (!report.ok) {
+    for (const issue of report.issues) {
+      console.warn(pc.yellow(`⚠ [${issue.code}] ${issue.locale} × ${issue.namespace}`));
+    }
+  }
+  // ...原有生成逻辑
 } catch (err) {
   if (err instanceof I18nextKitError) {
-    console.error(pc.red(`✗ [${err.code}] ${err.message}`));
+    console.error(pc.red(`✗ ${err.message}`));
     process.exit(1);
   }
   throw err;
 }
 ```
 
-### 完成后你能看到
-
-针对场景 A~D 分别跑一遍，**每种都有预期颜色和退出码**。可以录一个 asciinema 做纪念。
-
-### M5 验收清单
-
-| 状态 | 项 |
-|:--:|---|
-| ⬜ | 场景 A：红色错误 + exit 1 |
-| ⬜ | 场景 B：红色错误 + exit 1 |
-| ⬜ | 场景 C：黄色警告，但生成文件正常（tsc 可能会补刀，属于预期） |
-| ⬜ | 场景 D：红色错误 + exit 1 |
-| ⬜ | 所有 issue 带 `locale` / `namespace` / `expectedPath` 字段 |
-| ⬜ | `I18nextKitError` 可以通过 `instanceof` 识别、`code` 可读 |
-
-### M5 故意没做的事
-
-- ❌ validate 里的 warning 升级为 error 的开关（留给 plugin/CLI 的 `onError` 选项）
-- ❌ key-level 校验（由 TS `satisfies` 兜底，不进 core）
-- ❌ 单测
+✓ 验证：
+- 正常：无任何警告，4 个文件生成
+- `rm __tests__/fixtures/basic/zh-CN/common.ts` → 黄色 warning，但文件照常生成
+- `rm -rf __tests__/fixtures/basic/base` → 红色错误，退出 1
+- 恢复：`git checkout __tests__/fixtures/basic`
 
 ---
 
-## 🎯 M6. 对外接口统一 + 单测锁住
+### 🏁 M6 单元测试
 
-### 场景
-
-把 `scripts/dev-run.mjs` 里那一大段手写的 `scanContracts → scanLocales → validate → emit × 4 → writeAtomic × 4` 流程，**收敛到一个函数**：
+新建 `src/core/validate.test.ts`：
 
 ```ts
-import { generateAll } from '../src/core';
+import { describe, expect, it } from 'vitest';
+import { validate } from './validate';
 
-await generateAll({
-  root: process.cwd(),
-  i18nDir: '__tests__/fixtures/basic',
-  locales: ['en-US', 'zh-CN', 'zh-HK'],
-  mode: 'folder',
+describe('validate', () => {
+  it('完美对齐时 ok=true, issues 为空', () => {
+    const r = validate(
+      [{ name: 'common' }],
+      [{ locale: 'en-US', namespace: 'common' }],
+      ['en-US'],
+    );
+    expect(r.ok).toBe(true);
+    expect(r.issues).toEqual([]);
+  });
+
+  it('缺 locale 文件 → MISSING_LOCALE_FILE', () => {
+    const r = validate(
+      [{ name: 'common' }, { name: 'file' }],
+      [{ locale: 'en-US', namespace: 'common' }],
+      ['en-US'],
+    );
+    expect(r.ok).toBe(false);
+    expect(r.issues).toContainEqual({
+      code: 'MISSING_LOCALE_FILE',
+      locale: 'en-US',
+      namespace: 'file',
+    });
+  });
+
+  it('多余 locale 文件 → EXTRA_LOCALE_FILE', () => {
+    const r = validate(
+      [{ name: 'common' }],
+      [
+        { locale: 'en-US', namespace: 'common' },
+        { locale: 'en-US', namespace: 'legacy' },
+      ],
+      ['en-US'],
+    );
+    expect(r.issues).toContainEqual({
+      code: 'EXTRA_LOCALE_FILE',
+      locale: 'en-US',
+      namespace: 'legacy',
+    });
+  });
 });
 ```
 
-这才是 core 对外的**正式 API**。`scripts/dev-run.mjs` 退化成一个几行的调用示例。
+再补 `scan-contracts.test.ts` 两个 case：
 
-然后：
+```ts
+it('目录不存在时抛 CONTRACTS_DIR_NOT_FOUND', () => {
+  expect(() => scanContracts('/path/does/not/exist')).toThrow(I18nextKitError);
+});
 
-```bash
-pnpm test            # 全绿
-pnpm coverage        # core 覆盖 ≥ 85%
-pnpm build           # dist/core/index.js 暴露 generateAll
+it('空目录时抛 EMPTY_CONTRACTS', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'empty-'));
+  try {
+    scanContracts(dir);
+    expect.fail('应该抛错');
+  } catch (e) {
+    expect(e).toBeInstanceOf(I18nextKitError);
+    expect((e as I18nextKitError).code).toBe('EMPTY_CONTRACTS');
+  }
+});
 ```
 
-### 为什么现在做这一步
+✓ 验证：`pnpm test` 全绿。
 
-M1~M5 积累的 6~7 个独立函数，都是"半成品工具"，对外暴露要求用户按顺序手动串。
-M6 做两件事：
-1. 造一个**正式的对外函数** `generateAll`，包装好整条流水线
-2. 用单测把 M1~M5 的所有行为锁死，以后重构不会回滚
+---
 
-到此 core 才算**可交付**。Phase 2 的 plugin / CLI 只要调 `generateAll()` 就完事了。
+## 🏁 M7. 一键串起来 + 收官
 
-### 这一轮要新建/修改的文件
+**这一轮结束时你拥有的东西**：`generateAll(config)` 单一入口、`dev-run.mjs` 退化到 ≤ 15 行、单测覆盖率 ≥ 85%。
 
-| 文件 | 动作 | 目的 |
-|---|---|---|
-| `src/core/types.ts` | 追加 | `I18nextKitConfig`（用户面向，含 optional） + `GenerateResult` |
-| `src/core/resolve-config.ts` | 新建 | `resolveConfig(userConfig): ResolvedConfig` |
-| `src/core/orchestrate.ts` | 填充 | `generateAll(userConfig): Promise<GenerateResult>` |
-| `src/core/index.ts` | 修改 | 收口 public API export |
-| `src/core/**/*.test.ts` | 新建 | 每模块一份单测 |
-| `src/core/__tests__/orchestrate.test.ts` | 新建 | 端到端集成测试 |
-| `scripts/dev-run.mjs` | 重构 | 只剩对 `generateAll` 的调用 |
+---
 
-### 关键实现要点
+### Step 31. 定义用户面向的 `I18nextKitConfig`
 
-#### `I18nextKitConfig`（用户面向）
+在 `src/core/types.ts` 追加：
+
 ```ts
 export interface I18nextKitConfig {
-  root?: string;                      // default process.cwd()
-  i18nDir?: string;                   // default 'src/i18n'
-  contractsDir?: string;              // default 'base'
-  locales: readonly string[];         // required
-  mode: 'folder' | 'file';            // required
-  outDir?: string;                    // default = i18nDir
-  fileNames?: Partial<{
-    resources: string; contracts: string; runtime: string; dts: string;
-  }>;
+  root?: string;
+  i18nDir?: string;
+  contractsDir?: string;
+  outDir?: string;
+  locales: readonly string[];
+  mode: 'folder' | 'file';
+}
+
+export interface ResolvedConfig {
+  root: string;
+  i18nDir: string;        // absolute
+  contractsDir: string;   // absolute
+  outDir: string;         // absolute
+  locales: readonly string[];
+  mode: 'folder' | 'file';
 }
 ```
 
-#### `resolveConfig` 职责
-- 填默认值
-- 相对路径 → 绝对路径
-- `mode: 'file'` 这一阶段抛 `INVALID_CONFIG`（留给 Phase 3）
-- `locales` 空数组抛 `INVALID_CONFIG`
+---
 
-#### `generateAll` 流水线
+### Step 32. 写 `resolveConfig`
+
+新建 `src/core/resolve-config.ts`：
+
 ```ts
-export async function generateAll(userConfig: I18nextKitConfig): Promise<GenerateResult> {
+import { isAbsolute, resolve } from 'node:path';
+import { I18nextKitError } from './types';
+import type { I18nextKitConfig, ResolvedConfig } from './types';
+
+export function resolveConfig(config: I18nextKitConfig): ResolvedConfig {
+  if (!Array.isArray(config.locales) || config.locales.length === 0) {
+    throw new I18nextKitError(
+      'INVALID_CONFIG',
+      'locales 不能为空数组',
+    );
+  }
+  if (config.mode !== 'folder' && config.mode !== 'file') {
+    throw new I18nextKitError('INVALID_CONFIG', `未知 mode: ${config.mode}`);
+  }
+  if (config.mode === 'file') {
+    throw new I18nextKitError(
+      'INVALID_CONFIG',
+      "mode: 'file' 暂未实现（Phase 3）",
+    );
+  }
+
+  const root = config.root ? resolve(config.root) : process.cwd();
+  const i18nDir = resolve(root, config.i18nDir ?? 'src/i18n');
+  const contractsDir = isAbsolute(config.contractsDir ?? '')
+    ? config.contractsDir!
+    : resolve(i18nDir, config.contractsDir ?? 'base');
+  const outDir = config.outDir ? resolve(root, config.outDir) : i18nDir;
+
+  return { root, i18nDir, contractsDir, outDir, locales: config.locales, mode: config.mode };
+}
+```
+
+---
+
+### Step 33. 写 `generateAll`
+
+新建 `src/core/orchestrate.ts`：
+
+```ts
+import { join } from 'node:path';
+import { emitContracts } from './emit/contracts';
+import { emitDts } from './emit/dts';
+import { emitResources } from './emit/resources';
+import { emitRuntime } from './emit/runtime';
+import { resolveConfig } from './resolve-config';
+import { scanContracts } from './scan-contracts';
+import { scanLocalesFolder } from './scan-locales-folder';
+import type { I18nextKitConfig } from './types';
+import { validate, type ValidationReport } from './validate';
+import { writeIfChanged } from './write';
+
+export interface GenerateResult {
+  writtenFiles: string[];
+  validation: ValidationReport;
+  durationMs: number;
+}
+
+export async function generateAll(
+  userConfig: I18nextKitConfig,
+): Promise<GenerateResult> {
   const start = performance.now();
-  const resolved = resolveConfig(userConfig);
+  const config = resolveConfig(userConfig);
 
-  const namespaces = scanContracts(resolved);
-  const localeFiles = scanLocalesFolder(resolved);
-  const validation = validate(namespaces, localeFiles, resolved);
+  const namespaces = scanContracts(config.contractsDir);
+  const localeFiles = scanLocalesFolder(config.i18nDir, [...config.locales]);
+  const validation = validate(namespaces, localeFiles, [...config.locales]);
 
-  const writtenFiles: string[] = [];
-  const results = await Promise.all([
-    writeIfChanged(outPath('resources'), emitResources(namespaces, resolved)),
-    writeIfChanged(outPath('contracts'), emitContracts(namespaces, localeFiles, resolved)),
-    writeIfChanged(outPath('runtime'),   emitRuntime(resolved)),
-    writeIfChanged(outPath('dts'),       emitDts(resolved)),
-  ]);
-  // results 里 changed=true 的路径 push 进 writtenFiles
+  const written: string[] = [];
+  const artifacts: [string, string][] = [
+    ['generated-resources.ts', emitResources(namespaces)],
+    ['contracts.ts', emitContracts(namespaces, localeFiles, [...config.locales])],
+    ['generated-runtime.ts', emitRuntime([...config.locales])],
+    ['i18next.d.ts', emitDts()],
+  ];
+
+  for (const [file, content] of artifacts) {
+    const full = join(config.outDir, file);
+    if (writeIfChanged(full, content)) written.push(full);
+  }
 
   return {
-    writtenFiles,
+    writtenFiles: written,
     validation,
     durationMs: performance.now() - start,
   };
 }
 ```
 
-注意：**validation 失败不抛**，`ok: false` 也继续写产物。上层决策是否 exit。
+`src/core/index.ts` 补 export。
 
-#### 单测清单（按模块）
+---
 
-每个模块一个 `*.test.ts`，推荐用 `tmp` 起临时目录写真实文件。不 mock fs。
+### Step 34. 用 `tsx` 替代 build + dev-run，开发更顺滑
 
-| 模块 | 测试要点 |
-|---|---|
-| `scan-contracts` | 正常 / 空目录 / 目录不存在 / kebab 命名 / 忽略 `.d.ts` |
-| `scan-locales-folder` | 正常排序 / 某 locale 目录缺失 → 抛 `LOCALE_DIR_NOT_FOUND` |
-| `validate` | 完美对齐 / 缺 locale / 多余 locale |
-| `emit-resources` | snapshot（1 ns / 多 ns / kebab） |
-| `emit-contracts` | snapshot |
-| `emit-runtime` | snapshot + 动态 locale 组合 |
-| `emit-dts` | snapshot |
-| `resolve-config` | 默认值 / 相对路径解析 / 非法 locales=[] / mode=file 抛错 |
-| `orchestrate` | 端到端 4 文件齐 / 第二次运行内容一致 / validation.ok=false 仍写盘 |
-
-#### snapshot 测试模式
-```ts
-test('emit-resources: single namespace', () => {
-  const out = emitResources(fakeNamespaces, fakeConfig);
-  expect(out).toMatchInlineSnapshot(`...`);
-});
-```
-用 `toMatchInlineSnapshot` 可以让快照直接写在测试文件里，review 友好。
-
-### 完成后你能看到
+安装：
 
 ```bash
-$ pnpm test
-✓ scan-contracts (8)
-✓ scan-locales-folder (4)
-✓ validate (5)
-✓ emit-resources (3)
-✓ emit-contracts (2)
-✓ emit-runtime (3)
-✓ emit-dts (1)
-✓ resolve-config (6)
-✓ orchestrate (4)
-Test Files  9 passed (9)
-Tests  36 passed (36)
-
-$ pnpm coverage
-  core      |  91.2% |  88.5% |  93.1% |  91.2%
-
-$ pnpm build
-✓ dist/core/index.js (generateAll exported)
-
-$ cat scripts/dev-run.mjs
-// 只剩 10 行，import generateAll + 调用
+pnpm add -D tsx
 ```
 
-### M6 验收清单
+改 `scripts/dev-run.mjs` → `scripts/dev-run.ts`，内容退化到极简：
+
+```ts
+import pc from 'picocolors';
+import { generateAll, I18nextKitError } from '../src/core/index.js';
+
+try {
+  const result = await generateAll({
+    root: process.cwd(),
+    i18nDir: '__tests__/fixtures/basic',
+    outDir: '__tests__/fixtures/basic',
+    locales: ['en-US', 'zh-CN', 'zh-HK'],
+    mode: 'folder',
+  });
+
+  for (const f of result.writtenFiles) {
+    console.log(pc.green(`✓ ${f}`));
+  }
+  for (const i of result.validation.issues) {
+    console.warn(pc.yellow(`⚠ [${i.code}] ${i.locale} × ${i.namespace}`));
+  }
+  console.log(pc.dim(`完成，用时 ${result.durationMs.toFixed(1)}ms`));
+} catch (err) {
+  if (err instanceof I18nextKitError) {
+    console.error(pc.red(`✗ ${err.message}`));
+    process.exit(1);
+  }
+  throw err;
+}
+```
+
+在 `package.json` 加 script：
+
+```json
+"dev:run": "tsx scripts/dev-run.ts"
+```
+
+✓ 验证：
+
+```bash
+pnpm dev:run
+# ✓ /abs/path/generated-resources.ts
+# ✓ /abs/path/contracts.ts
+# ✓ /abs/path/generated-runtime.ts
+# ✓ /abs/path/i18next.d.ts
+# 完成，用时 8.3ms
+
+pnpm dev:run
+# 第二次跑：没有 ✓ 打印（内容一致）
+# 完成，用时 4.1ms
+```
+
+---
+
+### Step 35. 补单测、拉覆盖率到 85%
+
+新建 `src/core/resolve-config.test.ts` 和 `src/core/orchestrate.test.ts`：
+
+```ts
+// resolve-config.test.ts
+describe('resolveConfig', () => {
+  it('locales=[] 抛 INVALID_CONFIG', () => { /* ... */ });
+  it('mode=file 抛 INVALID_CONFIG', () => { /* ... */ });
+  it('相对 i18nDir 解析为绝对路径', () => { /* ... */ });
+  it('outDir 缺省时回落到 i18nDir', () => { /* ... */ });
+});
+
+// orchestrate.test.ts
+describe('generateAll', () => {
+  it('端到端生成 4 个文件', async () => {
+    const root = /* 用 tmp 建 fixture */;
+    const result = await generateAll({
+      root, i18nDir: '.', locales: ['en-US'], mode: 'folder',
+    });
+    expect(result.writtenFiles).toHaveLength(4);
+  });
+
+  it('第二次调用 writtenFiles 为空（幂等）', async () => {
+    /* 连续调两次 */
+  });
+
+  it('validation.ok=false 时仍写产物', async () => {
+    /* 故意少放一个 locale 文件 */
+  });
+});
+```
+
+跑覆盖率：
+
+```bash
+pnpm coverage
+# 确保 core 目录 ≥ 85%
+# 缺的 case 按报告补
+```
+
+---
+
+### 🏁 M7 验收
 
 | 状态 | 项 |
 |:--:|---|
-| ⬜ | `generateAll({..., mode:'folder'})` 端到端成功 |
-| ⬜ | 第二次调用产物内容与第一次**完全一致**（`diff` 为空） |
-| ⬜ | `mode: 'file'` 抛 `INVALID_CONFIG` |
-| ⬜ | `locales: []` 抛 `INVALID_CONFIG` |
-| ⬜ | `pnpm test` 绿，所有模块都有单测 |
+| ⬜ | `pnpm dev:run` 成功生成 4 个文件 |
+| ⬜ | 第二次 `pnpm dev:run` 所有文件 skipped（幂等） |
+| ⬜ | `__tests__/fixtures/basic` 下 `tsc --noEmit` 零错误 |
+| ⬜ | `pnpm test` 全绿 |
 | ⬜ | `pnpm coverage` core 覆盖率 ≥ 85% |
-| ⬜ | `pnpm build` 成功，`dist/core/index.js` 导出 `generateAll` |
-| ⬜ | `scripts/dev-run.mjs` 退化成 ≤ 15 行 |
-
-### M6 故意没做的事
-
-- ❌ Vite 插件（Phase 2）
-- ❌ CLI 交互（Phase 2）
-- ❌ 懒加载 runtime（Phase 3）
-- ❌ 单文件模式（Phase 3）
+| ⬜ | `pnpm build` 后 `dist/core/index.js` 导出 `generateAll` |
 
 ---
 
-## Phase 1 完成标志
+## Phase 1 完成 🎉
 
-Phase 1 完成时应具备：
-
-- ✅ fixture 工程（`__tests__/fixtures/basic/`）能生成 4 份产物
-- ✅ fixture 下 `tsc --noEmit` 零错误
-- ✅ 删任一 locale 文件 → contracts.ts 触发 tsc 报错
-- ✅ `generateAll()` 单一入口，行为被单测锁住
-- ✅ 覆盖率 ≥ 85%
-- ✅ 所有错误都有 error code + message
-- ✅ 产物幂等：两次生成内容一致
-
-此时 core 已经是**可以被 Phase 2 的 plugin / CLI 直接消费的稳定 API**。
+此时 core 已是一个**稳定、可单测、行为锁死**的纯逻辑库。
+下一步进入 Phase 2：把 `generateAll` 接到 Vite 插件和 CLI 上。
 
 ---
 
-## 附：文件最终形态速查
-
-Phase 1 结束时 `src/core/` 应该长这样：
+## 附录：`src/core/` 最终形态
 
 ```
 src/core/
 ├── index.ts                    # public re-exports
-├── types.ts                    # ResolvedConfig / I18nextKitConfig / Scanned* / I18nextKitError / Validation*
+├── types.ts                    # I18nextKitConfig / ResolvedConfig / I18nextKitError
 ├── resolve-config.ts           # resolveConfig()
 ├── scan-contracts.ts           # scanContracts()
 ├── scan-locales-folder.ts      # scanLocalesFolder()
 ├── validate.ts                 # validate()
-├── write.ts                    # writeAtomic() / writeIfChanged()
+├── write.ts                    # writeIfChanged()
 ├── orchestrate.ts              # generateAll()
-├── emit/
-│   ├── index.ts
-│   ├── resources.ts            # emitResources()
-│   ├── contracts.ts            # emitContracts()
-│   ├── runtime.ts              # emitRuntime()
-│   └── dts.ts                  # emitDts()
-└── __tests__/
-    ├── scan-contracts.test.ts
-    ├── scan-locales-folder.test.ts
-    ├── validate.test.ts
-    ├── resolve-config.test.ts
-    ├── emit-*.test.ts (×4)
-    └── orchestrate.test.ts
+├── scan-contracts.test.ts
+├── scan-locales-folder.test.ts
+├── validate.test.ts
+├── resolve-config.test.ts
+├── write.test.ts
+├── orchestrate.test.ts
+└── emit/
+    ├── resources.ts
+    ├── resources.test.ts
+    ├── contracts.ts
+    ├── contracts.test.ts
+    ├── runtime.ts
+    ├── runtime.test.ts
+    ├── dts.ts
+    └── dts.test.ts
 ```
-
-`__tests__/fixtures/basic/` 是整个 Phase 1 的"试验田"，所有里程碑都在上面逐步长肉。Phase 2 的 examples 可以继续复用这个 fixture。
