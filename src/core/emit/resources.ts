@@ -19,7 +19,7 @@ interface Namespace {
 export function emitResoureces(namespaces: Namespace[]) {
   // 新增 resourceNamespaces 对象
   const entries = namespaces
-    .map((ns) => ` ${ns.name}: {} as ${ns.typeName}`)
+    .map((ns) => ` ${formatKey(ns.name)}: {} as ${ns.typeName}`)
     .join("\n");
 
   //   console.log("entries:", entries);
@@ -35,4 +35,19 @@ export function emitResoureces(namespaces: Namespace[]) {
     .map((ns) => `import type ${ns.typeName} from "../base/${ns.name}"`)
     .join("\n");
   return `${imports}\n\nexport const defaultNS = 'common' as const;\n\n${body}\n`;
+}
+
+/**
+ * @description 该函数会返回一个合法的 JS 标识符，如果 name 是合法的 JS 标识符，则返回 name，否则返回 name 加上引号
+ * @param name - 需要格式化的字符串
+ * @example
+ * ```ts
+ * formatKey("user-management"); // "user-management"
+ * formatKey("user management"); // "'user management'"
+ * ```
+ * @returns - 返回一个合法的 JS 标识符
+ */
+function formatKey(name: string) {
+  const REGEX = /^[a-zA-Z_$][\w$]*$/; // 正则表达式，表示合法的 JS 标识符
+  return REGEX.test(name) ? name : `'${name}'`;
 }
