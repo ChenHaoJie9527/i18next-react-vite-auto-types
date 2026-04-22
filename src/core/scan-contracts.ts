@@ -7,6 +7,19 @@ export function scanContracts(dir: string) {
       const name = file.replace(".ts", "");
       return {
         name,
+        typeName: toPascalCase(name),
       };
     });
+}
+
+/**
+ * @description Convert a string to PascalCase.
+ * @param name - The name to convert to PascalCase.
+ */
+function toPascalCase(name: string) {
+  const parts = name.split("-");
+  const result = parts
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join("");
+  return result;
 }
