@@ -7,7 +7,7 @@ export function scanContracts(dir: string) {
       const name = file.replace(".ts", "");
       return {
         name,
-        typeName: toPascalCase(name),
+        typeName: `${toPascalCase(name)}Message`,
       };
     });
 }
