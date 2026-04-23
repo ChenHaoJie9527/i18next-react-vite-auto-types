@@ -22,19 +22,25 @@ export function emitResoureces(namespaces: Namespace[]) {
     .map((ns) => ` ${formatKey(ns.name)}: {} as ${ns.typeName}`)
     .join("\n");
 
-  //   console.log("entries:", entries);
+  const sorted = [...namespaces].sort((a, b) => a.name.localeCompare(b.name));
+  const defaultNSName = sorted[0]?.name ?? "common";
 
   const body = `export const resourceNamespaces = {
     ${entries}
   } as const;`;
 
-  //   console.log("body:", body);
-
   // 拼 import 语句列表
   const imports = namespaces
     .map((ns) => `import type ${ns.typeName} from "../base/${ns.name}"`)
     .join("\n");
-  return `${imports}\n\nexport const defaultNS = 'common' as const;\n\n${body}\n`;
+  return `${imports}
+  
+  export const defaultNS = ${defaultNSName} as const;
+
+  ${body}
+  
+  export type I18nNamespace = keyof typeof resourceNamespaces;
+  `;
 }
 
 /**
