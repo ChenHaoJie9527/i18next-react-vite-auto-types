@@ -34,4 +34,19 @@ describe("emitResoureces", () => {
         "
     `);
   });
+  it("kabab-case 的 key 会加引号", () => {
+    const out = emitResoureces([
+      {
+        name: "common",
+        typeName: "CommonMessage",
+      },
+      {
+        name: "user-management",
+        typeName: "UserManagementMessage",
+      },
+    ]);
+
+    expect(out).toContain(`'user-management': {} as UserManagementMessage`);
+    expect(out).toContain("common: {} as CommonMessage");
+  });
 });
