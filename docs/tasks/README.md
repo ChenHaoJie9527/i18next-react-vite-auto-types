@@ -139,7 +139,7 @@ P0-01 改包元信息
 | 状态  | 🏁     | 覆盖 Step | 里程碑主题            | 里程碑单测                                                        | 完成日期 |
 | --- | ------ | ------- | ---------------- | ------------------------------------------------------------ | ---- |
 | ✅   | **M1** | 01–06   | 第一个能转的轮子         | `scan-contracts.test.ts`                                     | —    |
-| ⬜   | **M2** | 07–12   | 第一段会说话的字符串       | `emit/resources.test.ts`                                     | —    |
+| ✅   | **M2** | 07–12   | 第一段会说话的字符串       | `emit/resources.test.ts`                                     | —    |
 | ⬜   | **M3** | 13–17   | 让它真的写文件          | `write.test.ts`                                              | —    |
 | ⬜   | **M4** | 18–22   | tsc 成为守门员        | `scan-locales-folder.test.ts` / `emit/contracts.test.ts`     | —    |
 | ⬜   | **M5** | 23–26   | `t('hello')` 有补全 | `emit/runtime.test.ts` / `emit/dts.test.ts`                  | —    |
