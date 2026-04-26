@@ -19,6 +19,15 @@ function makeTmpDir() {
   return mkdtempSync(join(tmpdir(), "i18next-kit-write-test-"));
 }
 
+/**
+ * @description 创建一个临时文件
+ * @returns - 返回临时文件的路径
+ */
+function tmpFile() {
+  const dir = mkdtempSync(join(tmpdir(), "i18next-kit-write-test-"));
+  return join(dir, "target.ts");
+}
+
 describe("writeIfChanged", () => {
   let lastDir: string | undefined;
 
@@ -32,11 +41,8 @@ describe("writeIfChanged", () => {
   });
 
   it("新文件或内容变化时返回 true，并写入目标内容", () => {
-    const dir = makeTmpDir();
-    // 记录临时目录
-    lastDir = dir;
-    // 路径形如 /tmp/i18next-kit-write-test-1234567890/out.txt
-    const p = join(dir, "out.txt");
+    const p = tmpFile();
+    lastDir = p;
 
     expect(writeIfChanged(p, "a123")).toBe(true);
     expect(readFileSync(p, "utf-8")).toBe("a123");
@@ -50,11 +56,18 @@ describe("writeIfChanged", () => {
   it("内容与磁盘一致时返回 false，且不重复写入", () => {
     const dir = makeTmpDir();
     lastDir = dir;
-    const p = join(dir, "out.txt");
+    const p = tmpFile();
     writeFileSync(p, "x", "utf-8");
     const before = readFileSync(p, "utf-8");
 
     expect(writeIfChanged(p, "x")).toBe(false);
     expect(readFileSync(p, "utf-8")).toBe(before);
+  });
+
+  it("内容变化时覆盖并返回 true", () => {
+    const p = tmpFile();
+    writeFileSync(p, "hello", "utf-8");
+    expect(writeIfChanged(p, "world")).toBe(true);
+    expect(readFileSync(p, "utf-8")).toBe("world");
   });
 });
