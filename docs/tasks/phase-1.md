@@ -112,6 +112,12 @@ return readdirSync(dir).filter(
 
 ✓ 验证：输出恢复为 `[ 'common.ts' ]`。
 
+> **验证完顺手清理掉 `common.d.ts`**：它的使命就是验证 filter，留着会在 M3 跑 `tsc --noEmit` 时干扰模块解析（一个无 import/export 的 `.d.ts` 会被 TS 当成全局脚本，并优先于同名 `.ts`，导致 `Cannot find module` 报错）：
+>
+> ```bash
+> rm __tests__/fixtures/basic/base/common.d.ts
+> ```
+
 ---
 
 ### Step 04. 去掉 `.ts` 后缀，只返回名字
@@ -288,12 +294,15 @@ type Namespace = { name: string; typeName: string };
 
 export function emitResources(namespaces: Namespace[]) {
   const imports = namespaces
-    .map((ns) => `import type { ${ns.typeName} } from '../base/${ns.name}';`)
+    .map((ns) => `import type { ${ns.typeName} } from './base/${ns.name}';`)
     .join('\n');
 
   return `${imports}\n\nexport const defaultNS = 'common' as const;\n`;
 }
 ```
+
+> **路径约定**：产物文件（`generated-resources.ts` / `contracts.ts` / `generated-runtime.ts` / `i18next.d.ts`）都生成到 `basic/` 根目录，而 `base/` 是它们的**子目录**——所以这里用 `'./base/${name}'`。
+> `en-US/common.ts` 写的 `'../base/common'` 是因为它自己在 `en-US/` 下，往上一层才到 `base/` 的兄弟位置，别把这两种路径搞混了。
 
 同时 `dev-run.mjs`：
 
@@ -305,8 +314,8 @@ console.log(emitResources(namespaces));
 
 ```bash
 pnpm build && node scripts/dev-run.mjs
-# import type { CommonMessage } from '../base/common';
-# import type { UserManagementMessage } from '../base/user-management';
+# import type { CommonMessage } from './base/common';
+# import type { UserManagementMessage } from './base/user-management';
 #
 # export const defaultNS = 'common' as const;
 ```

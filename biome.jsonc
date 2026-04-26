@@ -6,6 +6,9 @@
       "performance": {
         "noBarrelFile": "off",
         "useTopLevelRegex": "off"
+      },
+      "style": {
+        "useConsistentTypeDefinitions": "off"
       }
     }
   }
