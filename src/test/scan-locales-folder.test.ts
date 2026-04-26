@@ -1,0 +1,120 @@
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
+import { scanLocalesFolder } from "../core/scan-locales-folder";
+
+type ScanEntry = { locale: string; namespace: string };
+
+/*
+ * @description 对扫描结果进行排序，先按 locale 排序，再按 namespace 排序
+ * @param entries - 扫描结果
+ * @example
+ * ```ts
+ * const entries = [
+ *   { locale: "en-US", namespace: "common" },
+ *   { locale: "en-US", namespace: "user-management" },
+ *   { locale: "zh-CN", namespace: "common" },
+ *   { locale: "zh-CN", namespace: "user-management" },
+ * ];
+ * sortEntries(entries);
+ * // 结果：
+ * [
+ *   { locale: "en-US", namespace: "common" },
+ *   { locale: "en-US", namespace: "user-management" },
+ *   { locale: "zh-CN", namespace: "common" },
+ *   { locale: "zh-CN", namespace: "user-management" },
+ * ]
+ * ```
+ * @returns - 排序后的扫描结果
+ */
+function sortEntries(entries: ScanEntry[]): ScanEntry[] {
+  return [...entries].sort((a, b) =>
+    a.locale === b.locale
+      ? a.namespace.localeCompare(b.namespace)
+      : a.locale.localeCompare(b.locale)
+  );
+}
+
+describe("scanLocalesFolder", () => {
+  let root: string | undefined;
+
+  // 每次测试结束后删除临时目录
+  afterEach(() => {
+    if (root) {
+      rmSync(root, { recursive: true, force: true });
+      root = undefined;
+    }
+  });
+
+  it("locales 为空时返回空数组", () => {
+    root = join(tmpdir(), `scan-locales-empty-${Date.now()}`);
+    // 创建临时目录, recursive: true 表示创建多级目录
+    mkdirSync(root, { recursive: true });
+
+    const result = scanLocalesFolder(root, []);
+
+    expect(result).toEqual([]);
+  });
+
+  it("单个语言目录：只收录 .ts，去掉扩展名；排除 .d.ts 与非 .ts", () => {
+    root = join(tmpdir(), `scan-locales-one-${Date.now()}`);
+    // 访问临时目录下的 i18n 目录
+    const i18nDir = join(root, "i18n");
+    // 访问临时目录下的 i18n 目录下的 en-US 目录
+    const en = join(i18nDir, "en-US");
+    // 创建 en-US 目录
+    mkdirSync(en, { recursive: true });
+    // 创建 common.ts 文件
+    writeFileSync(join(en, "common.ts"), "export default {}");
+    // 创建 user-management.ts 文件
+    writeFileSync(join(en, "user-management.ts"), "export default {}");
+    // 创建 types.d.ts 文件
+    writeFileSync(join(en, "types.d.ts"), "export {}");
+    // 创建 readme.md 文件
+    writeFileSync(join(en, "readme.md"), "#");
+    // 扫描 i18n 目录下的 en-US 目录
+    const result = scanLocalesFolder(i18nDir, ["en-US"]);
+    // 对扫描结果进行排序
+    expect(sortEntries(result)).toEqual(
+      sortEntries([
+        { locale: "en-US", namespace: "common" },
+        { locale: "en-US", namespace: "user-management" },
+      ])
+    );
+  });
+
+  it("多个语言目录：按 locales 顺序遍历，合并为 locale + namespace 列表", () => {
+    root = join(tmpdir(), `scan-locales-multi-${Date.now()}`);
+    const i18nDir = join(root, "i18n");
+    mkdirSync(join(i18nDir, "zh-CN"), { recursive: true });
+    mkdirSync(join(i18nDir, "en-US"), { recursive: true });
+    mkdirSync(join(i18nDir, "zh-HK"), { recursive: true });
+    // i18n/zh-CN/a.ts
+    writeFileSync(join(i18nDir, "zh-CN", "a.ts"), "export default {}");
+    // i18n/en-US/b.ts
+    writeFileSync(join(i18nDir, "en-US", "b.ts"), "export default {}");
+    // i18n/zh-HK/c.ts
+    writeFileSync(join(i18nDir, "zh-HK", "c.ts"), "export default {}");
+
+    const result = scanLocalesFolder(i18nDir, ["zh-CN", "en-US", "zh-HK"]);
+
+    expect(sortEntries(result)).toEqual(
+      sortEntries([
+        { locale: "zh-CN", namespace: "a" },
+        { locale: "en-US", namespace: "b" },
+        { locale: "zh-HK", namespace: "c" },
+      ])
+    );
+  });
+
+  it("某语言目录下无 .ts 源文件时，该语言不产生条目", () => {
+    root = join(tmpdir(), `scan-locales-only-dts-${Date.now()}`);
+    const i18nDir = join(root, "i18n");
+    const ja = join(i18nDir, "ja-JP");
+    mkdirSync(ja, { recursive: true });
+    writeFileSync(join(ja, "only.d.ts"), "export {}");
+
+    expect(scanLocalesFolder(i18nDir, ["ja-JP"])).toEqual([]);
+  });
+});
