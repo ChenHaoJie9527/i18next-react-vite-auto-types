@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import {
+  emitContracts,
   emitResources,
   scanContracts,
   scanLocalesFolder,
@@ -19,4 +20,17 @@ console.log(
 
 const locales = ["en-US", "zh-CN", "zh-HK"];
 const localeFiles = scanLocalesFolder(outDir, locales);
+
 console.log("localeFiles =>", localeFiles);
+
+const contractsContent = emitContracts(namespaces, localeFiles, locales);
+
+const contractsChanged = writeIfChanged(
+  join(outDir, "contracts.ts"),
+  contractsContent
+);
+console.log(
+  contractsChanged
+    ? "✓ wrote contracts.ts"
+    : "· skipped contracts.ts (no change)"
+);
