@@ -1,8 +1,15 @@
 export function emitRuntime(locales: string[]) {
   const globPattern = createGlobPattern(locales);
-  // initialResources: 'en-US': {}, 'zh-CN': {}
-  const initialResources = createAlternation(locales);
-  return globPattern;
+  const initialResources = createInitialResources(locales);
+
+  const modules = `const modules: Record<string, unknown> = import.meta.glob(
+    '${globPattern}',
+    { eager: true },
+  );`;
+
+  const resources = `const resources: Resource = { ${initialResources} };`;
+
+  return `${modules}\n${resources}`;
 }
 
 /**
