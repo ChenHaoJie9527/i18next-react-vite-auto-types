@@ -5,14 +5,12 @@ import type { CommonMessage } from "./base/common";
 import type { FileMessage } from "./base/file";
 import type { UserManagementMessage } from "./base/user-management";
 
-
-export const defaultNS = 'common' as const;
+export const defaultNS = "common" as const;
 
 export const resourceNamespaces = {
-     common: {} as CommonMessage,
- file: {} as FileMessage,
- 'user-management': {} as UserManagementMessage,
-  } as const;
-  
+  common: {} as CommonMessage,
+  file: {} as FileMessage,
+  "user-management": {} as UserManagementMessage,
+} as const;
+
 export type I18nNamespace = keyof typeof resourceNamespaces;
-  
