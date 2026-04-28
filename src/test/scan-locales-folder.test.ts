@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -116,5 +116,63 @@ describe("scanLocalesFolder", () => {
     writeFileSync(join(ja, "only.d.ts"), "export {}");
 
     expect(scanLocalesFolder(i18nDir, ["ja-JP"])).toEqual([]);
+  });
+
+  it("遍历每个 locale 目录，返回（locale, namespace）对", () => {
+    // 创建一个临时的i18n目录
+    const root = mkdtempSync(join(tmpdir(), "i18n-"));
+    const locales = ["en-US", "zh-CN", "zh-HK"];
+    for (const locale of locales) {
+      // i18n/en-US、i18n/zh-CN、i18n/zh-HK
+      mkdirSync(join(root, locale), { recursive: true });
+      writeFileSync(join(root, locale, "common.ts"), "export default {}");
+      writeFileSync(
+        join(root, locale, "user-management.ts"),
+        "export default {}"
+      );
+      writeFileSync(join(root, locale, "file.ts"), "export default {}");
+    }
+
+    const reuslt = scanLocalesFolder(root, locales);
+    expect(reuslt).toEqual(
+      expect.arrayContaining([
+        {
+          locale: "en-US",
+          namespace: "common",
+        },
+        {
+          locale: "en-US",
+          namespace: "user-management",
+        },
+        {
+          locale: "en-US",
+          namespace: "file",
+        },
+        {
+          locale: "zh-CN",
+          namespace: "common",
+        },
+        {
+          locale: "zh-CN",
+          namespace: "user-management",
+        },
+        {
+          locale: "zh-CN",
+          namespace: "file",
+        },
+        {
+          locale: "zh-HK",
+          namespace: "common",
+        },
+        {
+          locale: "zh-HK",
+          namespace: "user-management",
+        },
+        {
+          locale: "zh-HK",
+          namespace: "file",
+        },
+      ])
+    );
   });
 });
