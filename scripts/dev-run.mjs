@@ -1,36 +1,30 @@
 import { join } from "node:path";
 import {
   emitContracts,
+  emitDts,
   emitResources,
+  emitRuntime,
   scanContracts,
   scanLocalesFolder,
   writeIfChanged,
 } from "../dist/core/index.cjs";
 
-const BASE = "base";
 const outDir = "./__tests__/fixtures/basic";
-const namespaces = scanContracts(join(outDir, BASE));
-const content = emitResources(namespaces);
-
-const changed = writeIfChanged(join(outDir, "generated-resources.ts"), content);
-
-console.log(
-  changed ? "✓ wrote generated-resources.ts" : "· skipped (no change)"
-);
-
 const locales = ["en-US", "zh-CN", "zh-HK"];
 const localeFiles = scanLocalesFolder(outDir, locales);
+const namespaces = scanContracts(join(outDir, "base"));
 
-console.log("localeFiles =>", localeFiles);
+const artifacts = [
+  ["generated-resources.ts", emitResources(namespaces)],
+  ["contracts.ts", emitContracts(namespaces, localeFiles, locales)],
+  ["generated-runtime.ts", emitRuntime(locales)],
+  ["i18next.d.ts", emitDts()],
+];
 
-const contractsContent = emitContracts(namespaces, localeFiles, locales);
+const artifactsMap = new Map(artifacts);
 
-const contractsChanged = writeIfChanged(
-  join(outDir, "contracts.ts"),
-  contractsContent
-);
-console.log(
-  contractsChanged
-    ? "✓ wrote contracts.ts"
-    : "· skipped contracts.ts (no change)"
-);
+// 遍历 artifactsMap 并写入文件
+for (const [file, content] of artifactsMap) {
+  const changed = writeIfChanged(join(outDir, file), content);
+  console.log(changed ? `✓ wrote ${file}` : `· skipped ${file}`);
+}

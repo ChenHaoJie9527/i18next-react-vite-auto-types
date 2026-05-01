@@ -27,11 +27,15 @@ import './contracts';
 ${modules}
 ${resources}
 for (const p in modules) {
-const match = p.match(/^\\.\\/(${alternation})\\/(.+)\\.ts$/);
-  if (!match) continue;
-  const [, locale, ns] = match;
-  const mod = modules[p] as { default: ResourceKey };
-  (resources[locale] as Record<string, ResourceKey>)[ns] = mod.default;
+  if (Object.hasOwn(modules, p)) {
+    const match = p.match(/^\\.\\/(${alternation})\\/(.+)\\.ts$/);
+    if (!match) {
+      continue;
+    }
+    const [, locale, ns] = match;
+    const mod = modules[p] as { default: ResourceKey };
+    (resources[locale] as Record<string, ResourceKey>)[ns] = mod.default;
+  }
 }
 
 export function initI18n(

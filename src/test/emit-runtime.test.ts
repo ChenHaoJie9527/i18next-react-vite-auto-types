@@ -42,11 +42,15 @@ const modules: Record<string, unknown> = import.meta.glob(
   );
 const resources: Resource = { 'en-US': {}, 'zh-CN': {} };
 for (const p in modules) {
-const match = p.match(/^\\.\\/(en-US|zh-CN)\\/(.+)\\.ts$/);
-  if (!match) continue;
-  const [, locale, ns] = match;
-  const mod = modules[p] as { default: ResourceKey };
-  (resources[locale] as Record<string, ResourceKey>)[ns] = mod.default;
+  if (Object.hasOwn(modules, p)) {
+    const match = p.match(/^\\.\\/(en-US|zh-CN)\\/(.+)\\.ts$/);
+    if (!match) {
+      continue;
+    }
+    const [, locale, ns] = match;
+    const mod = modules[p] as { default: ResourceKey };
+    (resources[locale] as Record<string, ResourceKey>)[ns] = mod.default;
+  }
 }
 
 export function initI18n(
