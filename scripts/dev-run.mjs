@@ -1,11 +1,14 @@
 import { join } from "node:path";
+import pc from "picocolors";
 import {
   emitContracts,
   emitDts,
   emitResources,
   emitRuntime,
+  I18nextKitError,
   scanContracts,
   scanLocalesFolder,
+  validate,
   writeIfChanged,
 } from "../dist/core/index.cjs";
 
@@ -27,4 +30,21 @@ const artifactsMap = new Map(artifacts);
 for (const [file, content] of artifactsMap) {
   const changed = writeIfChanged(join(outDir, file), content);
   console.log(changed ? `✓ wrote ${file}` : `· skipped ${file}`);
+}
+
+try {
+  const report = validate(namespaces, localeFiles, locales);
+  if (!report.ok) {
+    for (const issue of report.issues) {
+      console.warn(
+        pc.yellow(`⚠ [${issue.code}] ${issue.locale} × ${issue.namespace}`)
+      );
+    }
+  }
+} catch (error) {
+  if (error instanceof I18nextKitError) {
+    console.error(pc.red(`✗ ${error.message}`));
+    process.exit(1);
+  }
+  throw error;
 }
