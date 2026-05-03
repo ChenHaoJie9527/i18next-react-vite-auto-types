@@ -1,3 +1,13 @@
+/**
+ * Create the generated runtime module source code.
+ *
+ * The generated module eagerly imports locale namespace files with
+ * `import.meta.glob`, builds the i18next resources object, and exports
+ * `initI18n()` for React applications.
+ *
+ * @param locales - Locales to include in the runtime glob pattern.
+ * @returns TypeScript source code for the generated runtime module.
+ */
 export function emitRuntime(locales: string[]) {
   const globPattern = createGlobPattern(locales);
   const initialResources = createInitialResources(locales);
@@ -54,9 +64,10 @@ export function initI18n(
 }
 
 /**
- * @description 创建 glob 模式
- * @param locales - 语言列表
- * @returns - 返回一个字符串，表示 glob 模式
+ * Create the `import.meta.glob` pattern for locale namespace modules.
+ *
+ * @param locales - Locales to include in the glob pattern.
+ * @returns A glob pattern for generated runtime imports.
  * @example
  * ```ts
  * createGlobPattern(["en-US", "zh-CN"]) => "./{en-US,zh-CN}/*.ts"
@@ -67,9 +78,10 @@ export function createGlobPattern(locales: string[]) {
 }
 
 /**
- * @description 创建 alternation
- * @param locales - 语言列表
- * @returns - 返回一个字符串，表示 alternation
+ * Create a regular expression alternation for locale names.
+ *
+ * @param locales - Locales to include in the alternation.
+ * @returns A `|`-separated regular expression fragment.
  * @example
  * ```ts
  * createAlternation(["en-US", "zh-CN"]) => "en-US|zh-CN"
@@ -80,9 +92,10 @@ export function createAlternation(locales: string[]) {
 }
 
 /**
- * @description 创建 initialResources: 'en-US': {}, 'zh-CN': {}
- * @param locales - 语言列表
- * @returns - 返回一个字符串，表示 initialResources
+ * Create the initial i18next resources object entries.
+ *
+ * @param locales - Locales to initialize.
+ * @returns Object literal entries for the generated resources object.
  * @example
  * ```ts
  * createInitialResources(["en-US", "zh-CN"]) => "'en-US': {}, 'zh-CN': {}"

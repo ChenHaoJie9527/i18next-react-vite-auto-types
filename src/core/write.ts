@@ -1,10 +1,11 @@
 import { readFileSync, renameSync, writeFileSync } from "node:fs";
 
 /**
- * @description 检测文件是否发生变化，如果发生变化则写入文件
- * @param path - 文件路径
- * @param content - 文件内容
- * @returns - 是否写入成功
+ * Write a file only when its content has changed.
+ *
+ * @param path - Target file path.
+ * @param content - Content to write.
+ * @returns `true` when the file was written, or `false` when content was unchanged.
  * @example
  * ```ts
  * import { writeIfChanged } from "./write-if-change";
@@ -26,10 +27,11 @@ export function writeIfChanged(path: string, content: string) {
 }
 
 /**
- * @description 原子性写入文件，使用 `.tmp` 文件临时存储，然后重命名
- * @param path - 文件路径
- * @param content - 文件内容
- * @returns - 是否写入成功
+ * Write a file atomically through a temporary `.tmp` file.
+ *
+ * @param path - Target file path.
+ * @param content - Content to write.
+ * @returns `true` after the file is written.
  * @example
  * ```ts
  * import { writeFileAtomic } from "./write";
@@ -38,7 +40,6 @@ export function writeIfChanged(path: string, content: string) {
  * writeFileAtomic("test.txt", "Hello, world!");
  * // false
  * ```
- * @returns
  */
 function writeFileAtomic(path: string, content: string) {
   const tem = `${path}.tmp`;

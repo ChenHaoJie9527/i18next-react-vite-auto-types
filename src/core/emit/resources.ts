@@ -4,8 +4,9 @@ interface Namespace {
 }
 
 /**
- * @description 该函数会返回一段合法的 TypeScript 代码，表示 defaultNS 的值
- * @param namespaces - 命名空间列表
+ * Create the generated resource namespace metadata source code.
+ *
+ * @param namespaces - Namespace metadata used to generate imports and keys.
  * @example
  * ```ts
  * const namespaces = [
@@ -14,7 +15,7 @@ interface Namespace {
  * ];
  * emitResources(namespaces);
  * ```
- * @returns - 返回一个字符串，表示 defaultNS 的值
+ * @returns TypeScript source code for the generated resources module.
  */
 export function emitResources(namespaces: Namespace[]) {
   const entries = namespaces
@@ -45,16 +46,17 @@ export type I18nNamespace = keyof typeof resourceNamespaces;
 }
 
 /**
- * @description 该函数会返回一个合法的 JS 标识符，如果 name 是合法的 JS 标识符，则返回 name，否则返回 name 加上引号
- * @param name - 需要格式化的字符串
+ * Format a resource namespace key as an identifier or quoted property name.
+ *
+ * @param name - Namespace key to format.
  * @example
  * ```ts
  * formatKey("user-management"); // "user-management"
  * formatKey("user management"); // "'user management'"
  * ```
- * @returns - 返回一个合法的 JS 标识符
+ * @returns A valid object key fragment.
  */
 function formatKey(name: string) {
-  const REGEX = /^[a-zA-Z_$][\w$]*$/; // 正则表达式，表示合法的 JS 标识符
+  const REGEX = /^[a-zA-Z_$][\w$]*$/;
   return REGEX.test(name) ? name : `'${name}'`;
 }

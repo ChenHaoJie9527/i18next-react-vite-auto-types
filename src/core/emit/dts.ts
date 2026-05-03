@@ -1,6 +1,7 @@
 /**
- * @description 该函数会返回一段合法的 TypeScript 代码，表示 dts 文件内容
- * @returns - 返回一个字符串，表示 dts 文件内容
+ * Create the i18next module augmentation source code.
+ *
+ * @returns TypeScript declaration source for i18next custom type options.
  */
 export function emitDts() {
   return `/**

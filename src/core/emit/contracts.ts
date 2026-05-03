@@ -1,12 +1,20 @@
+/**
+ * Metadata for a namespace contract discovered in the base contracts folder.
+ */
 export type Namespace = { name: string; typeName: string };
+
+/**
+ * A locale-specific namespace file discovered in the i18n directory.
+ */
 export type LocaleFile = { locale: string; namespace: string };
 
 /**
- * @description 创建 contracts 源码
- * @param namespaces - 来自 base 的命名空间列表（含 typeName），决定 `import type` 与候选 namespace。
- * @param localeFiles - 扫描得到的「语言 × 命名空间」列表；只有同时在 **每个** `locales` 语言下都出现的 namespace 才会进入 `LocaleContract` 与 default import。
- * @param locales - 参与生成的语言顺序，并用于 `Record<'…' | …, LocaleContract>`。
- * @returns 创建后的 contracts 源码
+ * Create the generated locale contracts source code.
+ *
+ * @param namespaces - Namespace metadata discovered from base contract files.
+ * @param localeFiles - Locale and namespace pairs discovered from locale folders.
+ * @param locales - Locale order used in imports, object keys, and the `Record` type.
+ * @returns TypeScript source code for the generated contracts module.
  * @example
  * ```ts
  * emitContracts([{ name: "common", typeName: "CommonMessage" }, { name: "user-management", typeName: "UserManagementMessage" }], [{ locale: "en-US", namespace: "common" }, { locale: "zh-CN", namespace: "common" }], ["en-US", "zh-CN"]) => "import type { CommonMessage } from './base/common'; import type { UserManagementMessage } from './base/user-management'; import enUSCommon from './en-US/common'; import zhCNCommon from './zh-CN/common'; type LocaleContract = { common: CommonMessage; user-management: UserManagementMessage }; export const contracts = { 'en-US': { common: enUSCommon }, 'zh-CN': { common: zhCNCommon } } satisfies Record<'en-US' | 'zh-CN', LocaleContract>;
@@ -30,25 +38,20 @@ export function emitContracts(
     localeFiles.map((f) => fileKey(f.locale, f.namespace))
   );
 
-  // 仅当某个 namespace 在 locales 中「每个」语言下都有条目时，才进入 LocaleContract / value import。
-  // 仅有 base/foo.ts 而缺少 en-US/foo.ts 等时，scanLocalesFolder 不会列出 foo，此处也不会纳入。
+  // Include a namespace only when every locale has a matching source file.
   const complete = sortedNs.filter((ns) =>
     locales.every((loc) => fileSet.has(fileKey(loc, ns.name)))
   );
 
-  // 生成 value import
   const valueImports = createValueImports(locales, complete);
 
-  // 生成 LocaleContract 类型
   const localeContract = `type LocaleContract = {\n${complete
     .map((ns) => `  ${formatKey(ns.name)}: ${ns.typeName};`)
     .join("\n")}\n};`;
 
-  // 生成 locale 联合类型：比如 "en-US" | "zh-CN" | "zh-HK"
   const localeUnion =
     locales.length > 0 ? locales.map((l) => `'${l}'`).join(" | ") : "never";
 
-  // 生成 contracts 对象
   const contractsBody = createContractsObject(locales, complete);
 
   //   console.log("contractsBody =>", contractsBody);
@@ -71,16 +74,15 @@ export function emitContracts(
 }
 
 /**
- * @description 创建 value import，比如 import enUSCommon from './en-US/common'; import zhCNCommon from './zh-CN/common'; import zhHKCommon from './zh-HK/common';
- * @param locales - 需要创建的 locales
- * @param complete - 需要创建的 complete
- * @returns 创建后的 value import
+ * Create default imports for each complete locale and namespace pair.
+ *
+ * @param locales - Locales to generate imports for.
+ * @param complete - Namespaces that are present for every locale.
+ * @returns Default import statements for locale namespace modules.
  * @example
  * ```ts
  * createValueImports(["en-US", "zh-CN", "zh-HK"], [{ name: "common", typeName: "CommonMessage" }, { name: "user-management", typeName: "UserManagementMessage" }]) => "import enUSCommon from './en-US/common'; import zhCNCommon from './zh-CN/common'; import zhHKCommon from './zh-HK/common';"
  * ```
- * @param complete
- * @returns
  */
 function createValueImports(locales: string[], complete: Namespace[]): string {
   const result = locales
@@ -95,10 +97,11 @@ function createValueImports(locales: string[], complete: Namespace[]): string {
 }
 
 /**
- * @description 创建 contracts 对象
- * @param locales - 需要创建的 locales
- * @param complete - 需要转换的 complete
- * @returns 创建后的 contracts 对象
+ * Create the object literal body for the generated contracts export.
+ *
+ * @param locales - Locales to include as top-level keys.
+ * @param complete - Namespaces to include for each locale.
+ * @returns Object literal entries for the generated contracts export.
  * @example
  * ```ts
  * createContractsObject(["en-US", "zh-CN", "zh-HK"], [{ name: "common", typeName: "CommonMessage" }, { name: "user-management", typeName: "UserManagementMessage" }]) => "  'en-US': { common: enUSCommon, user-management: enUSUserManagement },  'zh-CN': { common: zhCNCommon, user-management: zhCNUserManagement },  'zh-HK': { common: zhHKCommon, user-management: zhHKUserManagement }"
@@ -126,42 +129,42 @@ function createContractsObject(
 }
 
 /**
- * @description 将 locale 和 namespace 拼接成一个字符串
- * @param locale - 需要转换的 locale
- * @param namespace - 需要转换的 namespace
- * @returns 转换后的字符串
+ * Create a stable lookup key from a locale and namespace.
+ *
+ * @param locale - Locale name.
+ * @param namespace - Namespace name.
+ * @returns A lookup key that cannot collide with normal namespace text.
  * @example
  * ```ts
  * fileKey("en-US", "common") => "en-US\0common"
  * fileKey("zh-CN", "user-management") => "zh-CN\0user-management"
  * ```
- * @returns
  */
 function fileKey(locale: string, namespace: string): string {
   return `${locale}\0${namespace}`;
 }
 
 /**
- * @description 将 locale 和 namespaceName 拼接成一个合法的 JS 标识符
- * @param locale - 需要转换的 locale
- * @param namespaceName - 需要转换的 namespaceName
- * @returns 转换后的字符串
+ * Create a valid JavaScript binding name from a locale and namespace.
+ *
+ * @param locale - Locale name.
+ * @param namespaceName - Namespace name.
+ * @returns A camel-cased binding name.
  * @example
  * ```ts
  * valueBinding("en-US", "common") => "enUSCommon"
  * valueBinding("zh-CN", "user-management") => "zhCNUserManagement"
  * ```
- * @param namespaceName
- * @returns
  */
 function valueBinding(locale: string, namespaceName: string): string {
   return `${toCamelLocale(locale)}${toPascal(namespaceName)}`;
 }
 
 /**
- * @description 将 key 格式化成合法的 JS 标识符，如果 key 是合法的 JS 标识符，则返回 key，否则返回 key 加上引号
- * @param name - 需要格式化的 key
- * @returns 格式化后的 key
+ * Format an object key as either an identifier or a quoted property name.
+ *
+ * @param name - Key to format.
+ * @returns A valid object key fragment.
  * @example
  * ```ts
  * formatKey("common") => "common"
@@ -173,9 +176,10 @@ function formatKey(name: string): string {
 }
 
 /**
- * @description 将 locale 转换成 camelCase
- * @param locale - 需要转换的 locale
- * @returns 转换后的 locale
+ * Convert a locale name to camel case.
+ *
+ * @param locale - Locale name to convert.
+ * @returns Camel-cased locale text.
  * @example
  * ```ts
  * toCamelLocale("en-US") => "enUS"
@@ -192,9 +196,10 @@ function toCamelLocale(locale: string) {
 }
 
 /**
- * @description 将 name 转换成 PascalCase
- * @param name - 需要转换的 name
- * @returns 转换后的 name
+ * Convert a namespace name to PascalCase.
+ *
+ * @param name - Namespace name to convert.
+ * @returns Pascal-cased namespace text.
  * @example
  * ```ts
  * toPascal("common") => "Common"

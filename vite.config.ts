@@ -1,4 +1,4 @@
-import dts from "vite-plugin-dts";
+import dts from "unplugin-dts/vite";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
@@ -11,6 +11,7 @@ export default defineConfig({
       include: ["src"],
       exclude: ["**/*.test.ts", "**/*.spec.ts"],
       entryRoot: "src",
+      bundleTypes: true,
     }),
   ],
   build: {
@@ -19,8 +20,14 @@ export default defineConfig({
     lib: {
       entry: {
         index: "src/index.ts", // plugin 主入口
-        "core/index": "src/core/index.ts", // core 主入口
-        "cli/index": "src/cli/index.ts", // cli 主入口
+        core: "src/core/index.ts", // core 主入口
+        cli: "src/cli/index.ts", // cli 主入口
+      },
+      fileName: (format, entryName) => {
+        const ext = format === "es" ? "js" : "cjs";
+        return entryName === "index"
+          ? `index.${ext}`
+          : `${entryName}/index.${ext}`;
       },
       formats: ["es", "cjs"],
     },

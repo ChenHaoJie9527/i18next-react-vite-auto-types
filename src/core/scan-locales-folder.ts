@@ -2,15 +2,15 @@ import { readdirSync } from "node:fs";
 import { join } from "node:path";
 
 /**
- * @description 扫描国际化目录，返回语言列表
- * @param i18nDir - 国际化目录
- * @param locales - 语言列表
- * @returns - 返回语言列表和命名空间列表
+ * Scan locale folders and return the namespace files found for each locale.
+ *
+ * @param i18nDir - Directory containing locale subdirectories.
+ * @param locales - Locales to scan.
+ * @returns Locale and namespace pairs discovered from `*.ts` files.
  */
 export function scanLocalesFolder(i18nDir: string, locales: string[]) {
   const result: { locale: string; namespace: string }[] = [];
   for (const locale of locales) {
-    // 拼接语言目录：./i18n/en-US or ./i18n/zh-CN or ./i18n/zh-HK
     const dir = join(i18nDir, locale);
     const files = readdirSync(dir, "utf-8")
       .filter((f) => f.endsWith(".ts") && !f.endsWith(".d.ts"))

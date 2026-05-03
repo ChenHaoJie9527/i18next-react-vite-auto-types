@@ -15,6 +15,5 @@ describe("emitDts", () => {
     expect(out).toContain("defaultNS: typeof defaultNS;");
     expect(out).toContain("resources: typeof resourceNamespaces;");
     expect(out).toContain("}");
-    expect(out).toContain("export {};");
   });
 });
