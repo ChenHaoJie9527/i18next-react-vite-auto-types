@@ -4,5 +4,5 @@ export { emitResources } from "./emit/resources";
 export { emitRuntime } from "./emit/runtime";
 export { scanContracts } from "./scan-contracts";
 export { scanLocalesFolder } from "./scan-locales-folder";
-export * from "./types";
+export { I18nextKitError, type I18nextKitErrorCode } from "./types";
 export { writeIfChanged } from "./write";
