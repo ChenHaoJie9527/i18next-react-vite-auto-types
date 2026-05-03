@@ -1,7 +1,11 @@
 import { isAbsolute, resolve } from "node:path";
-import { type I18nextKitConfig, I18nextKitError } from "./types";
+import {
+  type I18nextKitConfig,
+  I18nextKitError,
+  type ResolvedConfig,
+} from "./types";
 
-export function resolveConfig(config: I18nextKitConfig) {
+export function resolveConfig(config: I18nextKitConfig): ResolvedConfig {
   if (!Array.isArray(config.locales) || config.locales.length === 0) {
     throw new I18nextKitError("INVALID_CONFIG", "locales 不能为空数组");
   }
@@ -20,7 +24,15 @@ export function resolveConfig(config: I18nextKitConfig) {
   const root = resolveRoot(config.root);
   const i18nDir = resolveI18nDir(root, config.i18nDir);
   const contractsDir = resolveContractsDir(i18nDir, config.contractsDir);
-  return { root, i18nDir, contractsDir };
+  const outDir = config.outDir ? resolve(root, config.outDir) : i18nDir;
+  return {
+    root,
+    i18nDir,
+    contractsDir,
+    outDir,
+    locales: config.locales,
+    mode: config.mode,
+  };
 }
 
 /**
