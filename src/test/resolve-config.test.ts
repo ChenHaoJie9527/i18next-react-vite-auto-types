@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { resolveConfig } from "../core/resolve-config";
 import { I18nextKitError, type I18nextKitMode } from "../core/types";
@@ -45,5 +46,14 @@ describe("resolveConfig", () => {
   it("root 为空时使用当前工作目录", () => {
     const result = resolveConfig({ locales: ["en-US"], mode: "folder" });
     expect(result).toBe(process.cwd());
+  });
+
+  it("root 为非空时使用传入的 root", () => {
+    const result = resolveConfig({
+      locales: ["en-US"],
+      mode: "folder",
+      root: "test",
+    });
+    expect(result).toBe(resolve("test"));
   });
 });

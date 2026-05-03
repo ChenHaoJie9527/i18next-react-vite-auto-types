@@ -17,8 +17,16 @@ export function resolveConfig(config: I18nextKitConfig) {
     );
   }
 
-  // 如果 root 为空，则使用当前工作目录，否则使用传入的 root
-  // resolve 函数会自动将相对路径转换为绝对路径
-  const root = config.root ? resolve(config.root) : process.cwd();
+  const root = resolveRoot(config.root);
   return root;
+}
+
+/**
+ * 如果 root 为空，则使用当前工作目录，否则使用传入的 root
+ * resolve 函数会自动将相对路径转换为绝对路径
+ * @param root - 项目根目录
+ * @returns 项目根目录的绝对路径
+ */
+function resolveRoot(root: string | undefined) {
+  return root ? resolve(root) : process.cwd();
 }
