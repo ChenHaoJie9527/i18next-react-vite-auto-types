@@ -73,4 +73,26 @@ describe("resolveConfig", () => {
       i18nDir: resolve(process.cwd(), "src/i18n"),
     });
   });
+
+  it("i18nDir 为非空时使用传入的 i18nDir", () => {
+    const result = resolveConfig({
+      locales: ["en-US"],
+      mode: "folder",
+      i18nDir: "test/i18n",
+    });
+    expect(result).toMatchObject({
+      i18nDir: resolve("test", "i18n"),
+    });
+  });
+
+  it("i18nDir 为相对路径时使用相对于 root 的绝对路径", () => {
+    const result = resolveConfig({
+      locales: ["en-US"],
+      mode: "folder",
+      i18nDir: "test/i18n",
+    });
+    expect(result).toMatchObject({
+      i18nDir: resolve(process.cwd(), "test/i18n"),
+    });
+  });
 });
