@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { scanContracts } from "../../dist/core/index.cjs";
+import { I18nextKitError, scanContracts } from "../core";
 
 /**
  * @description 创建一个临时目录
@@ -59,5 +59,23 @@ describe("scanContracts", () => {
         },
       ])
     );
+  });
+
+  it("目录不存在时抛 CONTRACTS_DIR_NOT_FOUND", () => {
+    const dir = join(makeTmpDir(), "not-exists");
+
+    let error: unknown;
+    try {
+      scanContracts(dir);
+    } catch (e) {
+      error = e;
+    }
+
+    expect(error).toBeInstanceOf(I18nextKitError);
+    expect(error).toMatchObject({
+      code: "CONTRACTS_DIR_NOT_FOUND",
+      detail: { dir },
+      message: `[CONTRACTS_DIR_NOT_FOUND] 契约目录不存在：${dir}`,
+    });
   });
 });

@@ -20,7 +20,6 @@ describe("I18nextKitError", () => {
       "The contracts directory does not exist",
       { dir: "./contracts" }
     );
-    console.log("error.detail =>", error.detail);
     expect(error.code).toBe("CONTRACTS_DIR_NOT_FOUND");
     expect(error.message).toBe(
       "[CONTRACTS_DIR_NOT_FOUND] The contracts directory does not exist"

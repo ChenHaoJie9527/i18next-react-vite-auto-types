@@ -1,4 +1,5 @@
-import { readdirSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
+import { I18nextKitError } from "./types";
 
 /**
  * Scan a contracts directory and infer namespace metadata from `*.ts` files.
@@ -11,6 +12,15 @@ import { readdirSync } from "node:fs";
  * @returns Namespace metadata used by the code generators.
  */
 export function scanContracts(dir: string) {
+  const isContractsDir = existsSync(dir);
+  if (!isContractsDir) {
+    throw new I18nextKitError(
+      "CONTRACTS_DIR_NOT_FOUND",
+      `契约目录不存在：${dir}`,
+      { dir }
+    );
+  }
+
   return readdirSync(dir)
     .filter((file) => file.endsWith(".ts") && !file.endsWith(".d.ts"))
     .map((file) => {
