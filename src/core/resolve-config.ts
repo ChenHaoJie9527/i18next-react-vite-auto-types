@@ -18,7 +18,8 @@ export function resolveConfig(config: I18nextKitConfig) {
   }
 
   const root = resolveRoot(config.root);
-  return root;
+  const i18nDir = resolveI18nDir(root, config.i18nDir);
+  return { root, i18nDir };
 }
 
 /**
@@ -29,4 +30,15 @@ export function resolveConfig(config: I18nextKitConfig) {
  */
 function resolveRoot(root: string | undefined) {
   return root ? resolve(root) : process.cwd();
+}
+
+/**
+ * 如果 i18nDir 为空，则使用 "src/i18n"，否则使用传入的 i18nDir
+ * resolve 函数会自动将相对路径转换为绝对路径
+ * @param root - 项目根目录
+ * @param i18nDir - i18n 目录
+ * @returns i18n 目录的绝对路径
+ */
+function resolveI18nDir(root: string, i18nDir: string | undefined) {
+  return resolve(root, i18nDir ?? "src/i18n");
 }
