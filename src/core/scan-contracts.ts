@@ -21,7 +21,7 @@ export function scanContracts(dir: string) {
     );
   }
 
-  return readdirSync(dir)
+  const result = readdirSync(dir)
     .filter((file) => file.endsWith(".ts") && !file.endsWith(".d.ts"))
     .map((file) => {
       const name = file.replace(".ts", "");
@@ -30,6 +30,14 @@ export function scanContracts(dir: string) {
         typeName: `${toPascalCase(name)}Message`,
       };
     });
+
+  if (result.length === 0) {
+    throw new I18nextKitError("EMPTY_CONTRACTS", `契约目录为空：${dir}`, {
+      dir,
+    });
+  }
+
+  return result;
 }
 
 /**

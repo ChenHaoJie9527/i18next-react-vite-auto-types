@@ -78,4 +78,20 @@ describe("scanContracts", () => {
       message: `[CONTRACTS_DIR_NOT_FOUND] 契约目录不存在：${dir}`,
     });
   });
+  it("空目录时抛 EMPTY_CONTRACTS", () => {
+    const dir = mkdtempSync(join(tmpdir(), "empty-contracts-"));
+
+    expect(() => scanContracts(dir)).toThrow(I18nextKitError);
+
+    try {
+      scanContracts(dir);
+    } catch (e) {
+      expect(e).toBeInstanceOf(I18nextKitError);
+      expect(e).toMatchObject({
+        code: "EMPTY_CONTRACTS",
+        detail: { dir },
+        message: `[EMPTY_CONTRACTS] 契约目录为空：${dir}`,
+      });
+    }
+  });
 });
