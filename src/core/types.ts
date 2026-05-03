@@ -29,3 +29,21 @@ export class I18nextKitError extends Error {
     this.detail = detail ?? {};
   }
 }
+
+export type I18nextKitMode = "folder" | "file";
+
+type SharedConfig = {
+  locales: readonly string[];
+  mode: I18nextKitMode;
+};
+
+type ConfigPaths = {
+  root: string;
+  i18nDir: string;
+  contractsDir: string;
+  outDir: string;
+};
+
+export type I18nextKitConfig = SharedConfig & Partial<ConfigPaths>;
+
+export type ResolvedConfig = SharedConfig & ConfigPaths;
