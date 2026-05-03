@@ -41,4 +41,9 @@ describe("resolveConfig", () => {
       });
     }
   });
+
+  it("root 为空时使用当前工作目录", () => {
+    const result = resolveConfig({ locales: ["en-US"], mode: "folder" });
+    expect(result).toBe(process.cwd());
+  });
 });

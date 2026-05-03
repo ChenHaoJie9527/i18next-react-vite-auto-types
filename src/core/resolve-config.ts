@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import { type I18nextKitConfig, I18nextKitError } from "./types";
 
 export function resolveConfig(config: I18nextKitConfig) {
@@ -15,4 +16,9 @@ export function resolveConfig(config: I18nextKitConfig) {
       "mode: 'file' 暂未实现，请使用 'folder' 模式"
     );
   }
+
+  // 如果 root 为空，则使用当前工作目录，否则使用传入的 root
+  // resolve 函数会自动将相对路径转换为绝对路径
+  const root = config.root ? resolve(config.root) : process.cwd();
+  return root;
 }
