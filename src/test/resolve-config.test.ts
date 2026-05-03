@@ -95,4 +95,28 @@ describe("resolveConfig", () => {
       i18nDir: resolve(process.cwd(), "test/i18n"),
     });
   });
+
+  it("contractsDir 为空时使用 'base'", () => {
+    const result = resolveConfig({
+      locales: ["en-US"],
+      mode: "folder",
+      i18nDir: "test/i18n",
+      contractsDir: undefined,
+    });
+    expect(result).toMatchObject({
+      contractsDir: resolve("test", "i18n", "base"),
+    });
+  });
+
+  it("contractsDir 为非空时使用传入的 contractsDir，并转换为相对于 i18nDir 的相对路径", () => {
+    const result = resolveConfig({
+      locales: ["en-US"],
+      mode: "folder",
+      i18nDir: "test/i18n",
+      contractsDir: "contracts",
+    });
+    expect(result).toMatchObject({
+      contractsDir: resolve(process.cwd(), "test/i18n/contracts"),
+    });
+  });
 });
