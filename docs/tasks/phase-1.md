@@ -6,6 +6,7 @@
 > 从此以后，后面的 Step 不会偷偷把前面做好的东西搞坏。
 >
 > 开工前记住三句话：
+>
 > 1. **不要提前定义类型**。等真正有两处用到同一个 shape 时再抽。
 > 2. **不要提前配置**。硬编码路径和魔法字符串都是允许的，直到你自己烦了。
 > 3. **不要提前做边界处理**。坏输入就让它炸，等我们在某个 Step 明确说"这一步来加保护"才加。
@@ -14,15 +15,17 @@
 
 ## 路线图一览
 
-| 🏁 里程碑 | 场景上的价值 | 步骤 |
-|---|---|---|
-| **M1 第一个能转的轮子** | 能读目录，吐出 namespace 名字数组 | Step 01–06 |
-| **M2 第一段会说话的字符串** | 把数组拼成一段合法的 TS 代码打印出来 | Step 07–12 |
-| **M3 让它真的写文件** | 产物落盘、幂等、原子；fixture 里 `tsc` 能过 | Step 13–17 |
-| **M4 让 tsc 成为守门员** | contracts.ts 诞生，删个 locale 文件就 tsc 报错 | Step 18–22 |
+
+| 🏁 里程碑                    | 场景上的价值                                | 步骤         |
+| ------------------------- | ------------------------------------- | ---------- |
+| **M1 第一个能转的轮子**           | 能读目录，吐出 namespace 名字数组                | Step 01–06 |
+| **M2 第一段会说话的字符串**         | 把数组拼成一段合法的 TS 代码打印出来                  | Step 07–12 |
+| **M3 让它真的写文件**            | 产物落盘、幂等、原子；fixture 里 `tsc` 能过         | Step 13–17 |
+| **M4 让 tsc 成为守门员**        | contracts.ts 诞生，删个 locale 文件就 tsc 报错  | Step 18–22 |
 | **M5 让 `t('hello')` 有补全** | runtime + dts，fixture 里 App.tsx 有类型提示 | Step 23–26 |
-| **M6 让错误说人话** | 错误码体系 + validate，坏数据有彩色报告 | Step 27–30 |
-| **M7 一键串起来 + 收官** | `generateAll()` 单一入口 + 覆盖率 ≥ 85% | Step 31–35 |
+| **M6 让错误说人话**             | 错误码体系 + validate，坏数据有彩色报告             | Step 27–30 |
+| **M7 一键串起来 + 收官**         | `generateAll()` 单一入口 + 覆盖率 ≥ 85%      | Step 31–35 |
+
 
 ---
 
@@ -1081,6 +1084,7 @@ EOF
 ```
 
 ✓ 验证：
+
 - 在 VSCode 打开 `App.tsx`
 - 光标放 `t(` 后按 `Ctrl+Space` → 看到 `'hello'` 候选
 - 改成 `t('xxx')` → 红线
@@ -1295,6 +1299,7 @@ try {
 ```
 
 ✓ 验证：
+
 - 正常：无任何警告，4 个文件生成
 - `rm __tests__/fixtures/basic/zh-CN/common.ts` → 黄色 warning，但文件照常生成
 - `rm -rf __tests__/fixtures/basic/base` → 红色错误，退出 1
@@ -1612,14 +1617,16 @@ pnpm coverage
 
 ### 🏁 M7 验收
 
-| 状态 | 项 |
-|:--:|---|
-| ⬜ | `pnpm dev:run` 成功生成 4 个文件 |
-| ⬜ | 第二次 `pnpm dev:run` 所有文件 skipped（幂等） |
-| ⬜ | `__tests__/fixtures/basic` 下 `tsc --noEmit` 零错误 |
-| ⬜ | `pnpm test` 全绿 |
-| ⬜ | `pnpm coverage` core 覆盖率 ≥ 85% |
-| ⬜ | `pnpm build` 后 `dist/core/index.js` 导出 `generateAll` |
+
+| 状态  | 项                                                    |
+| --- | ---------------------------------------------------- |
+| ✅   | `pnpm dev:run` 成功生成 4 个文件                            |
+| ✅   | 第二次 `pnpm dev:run` 所有文件 skipped（幂等）                  |
+| ✅   | `__tests__/fixtures/basic` 下 `tsc --noEmit` 零错误      |
+| ✅   | `pnpm test` 全绿                                       |
+| ✅   | `pnpm coverage` core 覆盖率 ≥ 85%                       |
+| ✅   | `pnpm build` 后 `dist/core/index.js` 导出 `generateAll` |
+
 
 ---
 
@@ -1658,3 +1665,4 @@ src/core/
     ├── dts.ts
     └── dts.test.ts
 ```
+

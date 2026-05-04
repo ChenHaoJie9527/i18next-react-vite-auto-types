@@ -144,7 +144,7 @@ P0-01 改包元信息
 | ✅   | **M4** | 18–22   | tsc 成为守门员        | `scan-locales-folder.test.ts` / `emit/contracts.test.ts`     | —    |
 | ✅   | **M5** | 23–26   | `t('hello')` 有补全 | `emit/runtime.test.ts` / `emit/dts.test.ts`                  | —    |
 | ✅   | **M6** | 27–30   | 错误说人话            | `validate.test.ts` + scan 错误场景                               | —    |
-| ⬜   | **M7** | 31–35   | 一键串起来 + 收官       | `resolve-config.test.ts` / `orchestrate.test.ts` + 覆盖率 ≥ 85% | —    |
+| ✅   | **M7** | 31–35   | 一键串起来 + 收官       | `resolve-config.test.ts` / `orchestrate.test.ts` + 覆盖率 ≥ 85% | —    |
 
 
 > 每个 Step 的做法、代码样例、验证命令见 `[phase-1.md](./phase-1.md)`。
