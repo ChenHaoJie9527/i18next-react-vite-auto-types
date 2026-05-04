@@ -9,6 +9,7 @@
     "@vitest/ui": "^4.1.4",
     "picocolors": "^1.1.1",
     "tmp": "^0.2.5",
+    "tsx": "^4.21.0",
     "typescript": "^6.0.3",
     "ultracite": "^7.6.0",
     "unplugin-dts": "^1.0.0",
