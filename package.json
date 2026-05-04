@@ -30,7 +30,8 @@
     "coverage": "vitest run --coverage",
     "prepublishOnly": "npm run check && npm run typecheck && npm run test && npm run build",
     "check": "ultracite check",
-    "fix": "ultracite fix"
+    "fix": "ultracite fix",
+    "dev:run": "tsx scripts/dev-run.ts"
   },
   "type": "module",
   "version": "0.1.0",

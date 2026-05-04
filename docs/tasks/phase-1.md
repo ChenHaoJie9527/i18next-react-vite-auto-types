@@ -29,8 +29,8 @@
 ## 通用约定
 
 - **fixture 位置**：`__tests__/fixtures/basic/`，整个 Phase 1 就围绕它长
-- **临时驱动脚本**：`scripts/dev-run.mjs`，用来跑 core 函数并肉眼看效果
-- **跑一次循环**：`pnpm build && node scripts/dev-run.mjs`（Step 34 会引入 `tsx` 省去 build）
+- **临时驱动脚本**：`scripts/dev-run.ts`，用来跑 core 函数并肉眼看效果
+- **跑一次循环**：`pnpm dev:run`（通过 `tsx` 直接执行源码，省去先 build）
 - **验证命令**：后文出现的 `✓ 验证` 一律是在 Phase 1 主仓库目录下执行
 
 ---
@@ -1378,7 +1378,7 @@ it('空目录时抛 EMPTY_CONTRACTS', () => {
 
 ## 🏁 M7. 一键串起来 + 收官
 
-**这一轮结束时你拥有的东西**：`generateAll(config)` 单一入口、`dev-run.mjs` 退化到 ≤ 15 行、单测覆盖率 ≥ 85%。
+**这一轮结束时你拥有的东西**：`generateAll(config)` 单一入口、`dev-run.ts` 退化到 ≤ 15 行、单测覆盖率 ≥ 85%。
 
 ---
 
