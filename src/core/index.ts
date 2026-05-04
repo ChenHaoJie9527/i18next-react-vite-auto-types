@@ -5,7 +5,11 @@ export { emitRuntime } from "./emit/runtime";
 export { type GenerateResult, generateAll } from "./orchestrate";
 export { scanContracts } from "./scan-contracts";
 export { scanLocalesFolder } from "./scan-locales-folder";
-export { I18nextKitError, type I18nextKitErrorCode } from "./types";
+export {
+  type I18nextKitConfig,
+  I18nextKitError,
+  type I18nextKitErrorCode,
+} from "./types";
 export {
   type ValidationIssue,
   type ValidationReport,
