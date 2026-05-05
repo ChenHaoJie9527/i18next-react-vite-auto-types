@@ -1,5 +1,5 @@
 import type { Plugin, ViteDevServer } from "vite";
-import { generateAll } from "../core";
+import { generateAll, prepareI18nScaffold } from "../core";
 import { resolveConfig } from "../core/resolve-config";
 import type { I18nextKitConfig, ResolvedConfig } from "../core/types";
 import { debounce } from "./hmr";
@@ -28,7 +28,8 @@ export function i18nextKit(options: I18nextKitPluginOptions): Plugin {
       registerKitWatchTargets(devServer, () => mergedConfig);
     }
     try {
-      const result = generateAll(mergedConfig);
+      mergedConfig = prepareI18nScaffold(mergedConfig);
+      const result = generateAll({ ...mergedConfig, scaffold: false });
       resolvedCache = resolveConfig(mergedConfig);
       logGenerateResult(result);
       applyGenerateResult(result, { command, devServer, devError });

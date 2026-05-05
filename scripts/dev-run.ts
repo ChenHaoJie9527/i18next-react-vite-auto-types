@@ -8,6 +8,7 @@ try {
     outDir: "__tests__/fixtures/basic",
     locales: ["en-US", "zh-CN", "zh-HK"],
     mode: "folder",
+    scaffold: false,
   });
 
   for (const file of result.writtenFiles) {

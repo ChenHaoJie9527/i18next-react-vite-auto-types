@@ -1,9 +1,11 @@
 import { join } from "node:path";
+import { assertResolvedI18nLayout } from "./assert-layout";
 import { emitContracts } from "./emit/contracts";
 import { emitDts } from "./emit/dts";
 import { emitResources } from "./emit/resources";
 import { emitRuntime } from "./emit/runtime";
 import { resolveConfig } from "./resolve-config";
+import { prepareI18nScaffold } from "./scaffold";
 import { scanContracts } from "./scan-contracts";
 import { scanLocalesFolder } from "./scan-locales-folder";
 import type { I18nextKitConfig } from "./types";
@@ -22,7 +24,12 @@ export type GenerateResult = {
  */
 export function generateAll(userConfig: I18nextKitConfig): GenerateResult {
   const start = performance.now();
-  const config = resolveConfig(userConfig);
+  const skipLayoutAssert = userConfig.scaffold !== false;
+  const input = skipLayoutAssert ? prepareI18nScaffold(userConfig) : userConfig;
+  const config = resolveConfig(input);
+  if (!skipLayoutAssert) {
+    assertResolvedI18nLayout(config);
+  }
 
   const namespaces = scanContracts(config.contractsDir);
   const { files: localeFiles, missingLocaleDirs } = scanLocalesFolder(

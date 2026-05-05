@@ -8,6 +8,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { I18nextKitError } from "../core";
 import { generateAll } from "../core/orchestrate";
 
 function makeFixture() {
@@ -57,6 +58,7 @@ describe("generateAll", () => {
       outDir: "generated",
       locales: ["en-US", "zh-CN"],
       mode: "folder",
+      scaffold: false,
     });
 
     expect(result.validation.ok).toBe(true);
@@ -94,6 +96,7 @@ describe("generateAll", () => {
       outDir: "generated",
       locales: ["en-US", "zh-CN"],
       mode: "folder",
+      scaffold: false,
     });
 
     const second = generateAll({
@@ -102,6 +105,7 @@ describe("generateAll", () => {
       outDir: "generated",
       locales: ["en-US", "zh-CN"],
       mode: "folder",
+      scaffold: false,
     });
 
     expect(first.writtenFiles).toHaveLength(4);
@@ -119,6 +123,7 @@ describe("generateAll", () => {
       outDir: "generated",
       locales: ["en-US", "zh-CN"],
       mode: "folder",
+      scaffold: false,
     });
 
     expect(result.validation.ok).toBe(false);
@@ -141,6 +146,7 @@ describe("generateAll", () => {
       i18nDir: "src/i18n",
       locales: ["en-US", "zh-CN"],
       mode: "folder",
+      scaffold: false,
     });
 
     expect(result.validation.ok).toBe(false);
@@ -152,5 +158,60 @@ describe("generateAll", () => {
       ])
     );
     expect(result.validation.issues).toHaveLength(3);
+  });
+
+  it("缺少 i18n 根目录时抛出 I18N_DIR_NOT_FOUND", () => {
+    root = mkdtempSync(join(tmpdir(), "i18next-kit-orchestrate-no-i18n-"));
+    expect(() =>
+      generateAll({
+        root,
+        i18nDir: "src/i18n",
+        locales: ["en-US"],
+        mode: "folder",
+        scaffold: false,
+      })
+    ).toThrow(I18nextKitError);
+
+    try {
+      generateAll({
+        root,
+        i18nDir: "src/i18n",
+        locales: ["en-US"],
+        mode: "folder",
+        scaffold: false,
+      });
+    } catch (e) {
+      expect(e).toMatchObject({
+        code: "I18N_DIR_NOT_FOUND",
+      });
+    }
+  });
+
+  it("仅有 i18n 无 base 时抛出 CONTRACTS_DIR_NOT_FOUND 并带引导文案", () => {
+    root = mkdtempSync(join(tmpdir(), "i18next-kit-orchestrate-no-base-"));
+    mkdirSync(join(root, "src", "i18n"), { recursive: true });
+
+    expect(() =>
+      generateAll({
+        root,
+        i18nDir: "src/i18n",
+        locales: ["en-US"],
+        mode: "folder",
+        scaffold: false,
+      })
+    ).toThrow(I18nextKitError);
+
+    try {
+      generateAll({
+        root,
+        i18nDir: "src/i18n",
+        locales: ["en-US"],
+        mode: "folder",
+        scaffold: false,
+      });
+    } catch (e) {
+      expect(e).toMatchObject({ code: "CONTRACTS_DIR_NOT_FOUND" });
+      expect(String((e as Error).message)).toContain("创建 base");
+    }
   });
 });

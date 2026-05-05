@@ -1,6 +1,7 @@
 export type I18nextKitErrorCode =
   | "CONTRACTS_DIR_NOT_FOUND"
   | "EMPTY_CONTRACTS"
+  | "I18N_DIR_NOT_FOUND"
   | "LOCALE_DIR_NOT_FOUND"
   | "INVALID_CONFIG";
 
@@ -35,6 +36,10 @@ export type I18nextKitMode = "folder" | "file";
 type SharedConfig = {
   locales: readonly string[];
   mode: I18nextKitMode;
+  /**
+   * 为 true（默认）时在生成前按需写入最小 i18n 模板；单测或显式校验宿主目录时可设为 false。
+   */
+  scaffold?: boolean;
 };
 
 type ConfigPaths = {

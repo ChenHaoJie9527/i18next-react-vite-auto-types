@@ -3,6 +3,7 @@ export { emitDts } from "./emit/dts";
 export { emitResources } from "./emit/resources";
 export { emitRuntime } from "./emit/runtime";
 export { type GenerateResult, generateAll } from "./orchestrate";
+export { prepareI18nScaffold, SCAFFOLD_MARKER } from "./scaffold";
 export { scanContracts } from "./scan-contracts";
 export {
   type LocaleScanEntry,
