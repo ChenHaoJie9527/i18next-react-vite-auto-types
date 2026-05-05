@@ -70,6 +70,19 @@ export function sendValidationOverlay(
  * @param server - dev server
  * @param error - 错误
  */
+/**
+ * 发送空 HMR update，触发客户端 `clearErrorOverlay()`（与 Vite 内置行为一致）。
+ */
+export function clearDevOverlay(server: ViteDevServer | undefined) {
+  if (!server) {
+    return;
+  }
+  server.hot.send({
+    type: "update",
+    updates: [],
+  });
+}
+
 export function sendFatalOverlay(
   server: ViteDevServer | undefined,
   error: unknown

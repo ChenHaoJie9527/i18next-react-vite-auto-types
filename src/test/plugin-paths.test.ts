@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { resolveConfig } from "../core/resolve-config";
 import { isGeneratedFile, isSourceFile } from "../plugin/paths";
+import { isKitWatchPath } from "../plugin/watch";
 
 describe("plugin paths", () => {
   let root: string | undefined;
@@ -74,5 +75,20 @@ describe("plugin paths", () => {
     });
 
     expect(isSourceFile(join(root, "src", "main.ts"), resolved)).toBe(false);
+  });
+
+  it("isKitWatchPath：i18n 内文件与 i18n 的父级目录均视为相关", () => {
+    root = mkdtempSync(join(tmpdir(), "i18next-kit-watch-path-"));
+    const i18nDir = join(root, "src", "i18n");
+    const resolved = resolveConfig({
+      root,
+      locales: ["en-US"],
+      mode: "folder",
+    });
+
+    expect(isKitWatchPath(join(root, "src"), resolved)).toBe(true);
+    expect(isKitWatchPath(i18nDir, resolved)).toBe(true);
+    expect(isKitWatchPath(join(i18nDir, "base", "a.ts"), resolved)).toBe(true);
+    expect(isKitWatchPath(join(root, "other", "x.ts"), resolved)).toBe(false);
   });
 });
