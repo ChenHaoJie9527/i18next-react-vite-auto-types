@@ -46,7 +46,175 @@ buildEnd(error)
 
 ---
 
-## 2. Plugin MVP 任务拆解
+## 2. 如何编写 Vite 插件（本项目约定）
+
+### 2.1 插件形态
+
+Vite 插件在本仓库里体现为 **工厂函数**：接收 `I18nextKitPluginOptions`，返回 Vite 的 `Plugin` 对象；对象上按需挂接各类 [Plugin API 钩子](https://vite.dev/guide/api-plugin.html)。
+
+```ts
+import type { Plugin } from "vite";
+import type { I18nextKitConfig } from "../core";
+
+export type I18nextKitPluginOptions = I18nextKitConfig;
+
+export function i18nextKit(options: I18nextKitPluginOptions): Plugin {
+  let viteRoot: string;
+
+  return {
+    name: "i18next-kit",
+    configResolved(config) {
+      viteRoot = config.root;
+      // 合并用户 options + viteConfig.root → resolvedConfig（见 P2-P02）
+    },
+    async buildStart() {
+      // await generateAll(resolvedConfig)
+    },
+    configureServer(server) {
+      // 保存 server，用于 ws overlay / 终端提示（见 P2-P05）
+    },
+    async handleHotUpdate(ctx) {
+      // 仅源文件命中时 debounce 后再 generateAll（见 P2-P03 / P2-P04）
+      // return [] 可阻止本次文件参与默认 HMR 图更新，避免生成物触发死循环
+    },
+  };
+}
+```
+
+要点：
+
+- **`name`**：必填，用于日志与 `vite --debug`；固定为 `i18next-kit`。
+- **类型**：实现文件使用 `import type { Plugin } from "vite"`，只做类型擦除，不把 Vite 运行时打进插件产物；宿主通过 peer 安装 `vite`。
+- **`enforce` / `apply`**（可选）：需要早于或晚于其它插件时用 `enforce: "pre" | "post"`；仅在 dev 或仅在 build 跑逻辑时用 `apply: "serve" | "build"`。本插件若 dev/build 都要生成，通常可省略。
+
+### 2.2 在 vite.config 中注册
+
+```ts
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import { i18nextKit } from "i18next-kit";
+
+export default defineConfig({
+  plugins: [
+    i18nextKit({ locales: ["en-US", "zh-CN"], mode: "folder" }),
+    react(),
+  ],
+});
+```
+
+插件在 `plugins` 数组中的顺序会影响执行时机；建议在 `examples/basic` 里固定一种「先跑本插件生成，再由 React 等插件编译」的可复制顺序，并在联调时确认与 `@vitejs/plugin-react` 无冲突。
+
+### 2.3 常用钩子写法（与第 1 节生命周期对应）
+
+| 钩子 | 写法要点 |
+|------|----------|
+| **`configResolved`** | 第一个能稳定读到 `config.root`、`config.command`（`build` / `serve`）、`config.mode` 的位置；在此合成传给 `generateAll` 的配置。 |
+| **`buildStart`** | 可声明为 `async buildStart()`；dev 与 build 启动时都会执行，适合做首次 `generateAll`。 |
+| **`configureServer`** | 参数为 `ViteDevServer`；保存引用，便于 `server.ws.send` 推送 overlay（见 P2-P05）或读取 `server.config`。 |
+| **`handleHotUpdate`** | 参数 `ctx` 含 `ctx.file`；路径与 `isSourceFile` 比对前建议规范化（如统一 `/`）。若希望本次变更不进入默认 HMR 模块图更新，可 **`return []`**；否则返回 `undefined` 走 Vite 默认行为。 |
+| **`buildEnd`** | 签名为 `buildEnd(error?)`；适合做收尾统计。**validation / fatal 仍宜在生成阶段抛错**，避免只在 `buildEnd` 才失败。 |
+
+若宿主用 **Vitest** 的 `defineConfig`（`vitest/config`），可从同一入口引入 `Plugin` 类型（对 Vite 类型的再导出），与仓库根目录 README 中的示例一致；**本包 `src/plugin` 源码**仍以 `vite` 的 `Plugin` 为准，并与 `package.json` 里 `peerDependencies.vite` 版本范围对齐。
+
+### 2.4 单测与插件对象
+
+可对 `const p = i18nextKit(options)` 断言 `p.name`、`typeof p.buildStart`，或在临时目录用 Vite 的 `createServer` / `build` 做更偏集成的验证；与 P2-P02 的单测验收配套。
+
+### 2.5 本仓库内的完整插件开发闭环
+
+目标：在 **`i18next-react-vite-auto-types` 仓库里改 `src/plugin`**，同时能在真实 Vite 应用里验证行为，且不混淆「源码」与「发布产物」。
+
+| 环节 | 做法 |
+|------|------|
+| **实现** | 只在 `src/plugin/**/*.ts`（及抽离的 `paths.ts` / `hmr.ts` 等）写钩子逻辑；业务仍调用 `generateAll`。 |
+| **类型** | `import type { Plugin } from "vite"`；勿在 `core` 中 `import "vite"`。 |
+| **产物** | 本仓库 `pnpm dev` 对应 `vite build --watch`（见根目录 `package.json`），持续更新 `dist/index.js` 与 `dist/index.d.ts`。宿主项目应依赖 **已构建的 dist**，不要 `import` 本仓库的 `src/`。 |
+| **调试（无 UI）** | 宿主目录执行 `pnpm exec vite --debug` 或设置环境变量（见 [Vite 调试](https://vite.dev/guide/troubleshooting.html)），观察钩子顺序与重复执行次数。 |
+| **调试（有 UI）** | 宿主安装 **`vite-plugin-inspect`**（见 2.6），在浏览器里看各插件 transform 与模块图。 |
+
+联调时注意：若宿主通过 `file:` 指向本包，**watch 重建 dist 后**，有时需重启宿主 dev server（取决于 Vite 是否缓存已解析的插件模块）；若频繁改插件，可养成「保存插件 → 确认 dist 更新时间 → 重启宿主」的习惯，或在宿主里用 `optimizeDeps.exclude: ['i18next-kit']` 等策略减轻缓存（以实际表现为准再写死配置）。
+
+### 2.6 使用 vite-plugin-inspect 调试
+
+[`vite-plugin-inspect`](https://github.com/antfu/vite-plugin-inspect) 在开发服务器上提供 **`/__inspect/`** 可视化界面，用来核对：**配置解析后**、**各插件钩子是否按预期执行**、**模块经过哪些 transform**。调试「自己的插件有没有跑、跑几次、在哪个阶段跑」时非常有用。
+
+**安装（装在宿主工程，例如 `test-i18nextKit`）：**
+
+```bash
+pnpm add -D vite-plugin-inspect
+```
+
+**`vite.config.ts` 推荐写法：把 Inspect 放在前面**，便于在界面里看到排在后面的 `i18nextKit`、React 等插件对流水线的影响：
+
+```ts
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import Inspect from "vite-plugin-inspect";
+import { i18nextKit } from "i18next-kit";
+
+export default defineConfig({
+  plugins: [
+    Inspect(),
+    i18nextKit({
+      locales: ["en-US", "zh-CN"],
+      mode: "folder",
+      // …与 examples/basic 对齐的其余选项
+    }),
+    react(),
+  ],
+});
+```
+
+**使用：**
+
+1. 在宿主工程执行 `pnpm dev`（默认端口多为 `5173`，以终端输出为准）。
+2. 浏览器打开 `http://localhost:<port>/__inspect/`（路径固定为 `__inspect`，见插件文档）。
+3. 在界面中查看 **Modules / Plugins / Transform steps**，对照本仓库 `i18nextKit` 的 `name: "i18next-kit"` 是否出现在预期钩子上。
+
+**构建期排查（可选）：** 若需要看 `vite build` 阶段的中间态，可对 `Inspect` 传入 `build: true` 与 `outputDir`，构建后静态打开输出目录；日常以 dev + `__inspect` 为主即可（详见 [vite-plugin-inspect README](https://github.com/antfu/vite-plugin-inspect)）。
+
+**版本提示：** 宿主使用 Vite 8 时，若 `vite-plugin-inspect` 的 peer 范围尚未声明 Vite 8，可能出现 **pnpm/npm 的 peer 警告**；以能否正常打开 `__inspect` 为准，必要时升级到仓库 README 或 issue 中已验证的组合。
+
+### 2.7 宿主工程 test-i18nextKit（本地联调）
+
+你计划在仓库外（或与仓库同级）新建 **`test-i18nextKit`** 专门跑插件，推荐流程如下。
+
+**1）创建 Vite + React + TS 应用**
+
+```bash
+pnpm create vite@latest test-i18nextKit --template react-ts
+cd test-i18nextKit
+pnpm install
+```
+
+**2）本地安装本包（不先发 npm）**
+
+在 `test-i18nextKit` 目录执行（把路径换成你机器上 **`i18next-react-vite-auto-types` 的根目录** 的绝对路径）：
+
+```bash
+pnpm add -D file:/Users/you/path/to/i18next-react-vite-auto-types
+```
+
+这样依赖会指向该路径下的 `package.json`（入口为 `dist/`）。联调前务必在本包根目录先执行过一次 `pnpm build`，或开着本包的 `pnpm dev`（watch 构建）。
+
+**3）配置 Vite：Inspect + i18nextKit + React**
+
+按 **2.6** 写好 `plugins`；`i18nextKit` 的 `locales`、`contractsDir`、`i18nDir` 等需与 `test-i18nextKit` 里实际目录一致（可与 `examples/basic` 对齐后复制目录结构）。
+
+**4）日常开发循环**
+
+1. 终端 A：在本包根目录 `pnpm dev`（生成 watch 中的 `dist`）。  
+2. 终端 B：在 `test-i18nextKit` 根目录 `pnpm dev`。  
+3. 改本包 `src/plugin` → 保存 → 确认 `dist` 更新 → 视情况重启终端 B。  
+4. 用 `__inspect/` 确认 `i18next-kit` 钩子执行是否符合预期；用浏览器 + 改 i18n 源文件验证 HMR 与生成物。
+
+**5）若将来把宿主收进本 monorepo**
+
+可在仓库根增加 `pnpm-workspace.yaml`，将 `examples/test-i18nextKit` 或 `test-i18nextKit` 列为 workspace 包，并把依赖写成 `"i18next-kit": "workspace:*"`；CI 与文档再统一约定目录名。当前阶段用 **同级目录 + `file:`** 即可独立验证。
+
+---
+
+## 3. Plugin MVP 任务拆解
 
 ### P2-P01. 收敛插件配置类型
 
@@ -55,10 +223,10 @@ buildEnd(error)
 | `src/plugin/index.ts` | `i18nextKit(options)` 复用 core 的 `I18nextKitConfig` |
 | `src/core/types.ts` | 如有需要，导出插件可复用的配置类型 |
 
-当前 `src/plugin/index.ts` 自己定义了一份 `Config`，和 core 的 `I18nextKitConfig` 重复。第一步先删掉重复类型，改为：
+第一步保证 **options 类型与 core 一致**，不在 plugin 里重复维护一份配置 interface。`src/plugin/index.ts` 中应为：
 
 ```ts
-import type { I18nextKitConfig } from '../core';
+import type { I18nextKitConfig } from "../core";
 
 export type I18nextKitPluginOptions = I18nextKitConfig;
 ```
@@ -184,13 +352,15 @@ Validation warning:
 
 ### P2-P06. Example Basic
 
-目标：用真实 Vite React 项目验证插件。
+目标：用真实 Vite React 项目验证插件（与本仓库绑定的 fixture）。
 
 目录：
 
 ```text
 examples/basic/
 ```
+
+另：**第 2.7 节的 `test-i18nextKit`** 用于「包消费者视角」联调（`file:` + inspect），与 `examples/basic` 互补；完整闭环见 **P2-P08**。
 
 验收：
 
@@ -214,7 +384,17 @@ examples/basic/
 import { i18nextKit } from 'i18next-kit';
 ```
 
-## 3. 暂缓的 CLI 任务
+### P2-P08. Inspect + test-i18nextKit 联调闭环
+
+目标：把 **第 2.5～2.7 节**写进可重复的验收动作里——插件不仅在本仓库单测里正确，也在真实 Vite 宿主中可观察、可调试。
+
+验收：
+
+- `test-i18nextKit`（或等价命名的宿主）能 `pnpm dev`，`vite.config` 中包含 **`vite-plugin-inspect`** 与 **`i18nextKit`**，浏览器可打开 `__inspect` 页面并看到 `i18next-kit` 相关插件条目。
+- 宿主通过 **`file:`** 指向本仓库根路径；本仓库 **`pnpm dev`（watch dist）** 或 **`pnpm build`** 后，宿主侧功能与类型提示符合预期。
+- 文档或 README 片段中给出 **可复制** 的 `pnpm add -D file:<绝对路径>` 与 `plugins: [Inspect(), i18nextKit(...), react()]` 示例（可与 `phase-2.md` 第 2 节一致，避免多处漂移）。
+
+## 4. 暂缓的 CLI 任务
 
 CLI 放到 Plugin MVP 后面。原因：
 
@@ -224,7 +404,7 @@ CLI 放到 Plugin MVP 后面。原因：
 
 ---
 
-## 4. Plugin MVP 交付标准
+## 5. Plugin MVP 交付标准
 
 完成 Phase 2 后应该能达到：
 
@@ -233,21 +413,23 @@ CLI 放到 Plugin MVP 后面。原因：
 3. 故意删掉 `zh-CN/common.ts` → 浏览器 overlay 出现红色错误，但页面仍然可交互
 4. `pnpm build` → 若有 validation 错误，构建失败
 5. `pnpm build` 后包入口导出和类型完整
+6. **`test-i18nextKit`（或等价宿主）**：`file:` 安装本包 + `vite-plugin-inspect`，能在 `__inspect` 中确认 `i18next-kit` 行为，并完成与 **第 2.5～2.7 节**一致的日常联调循环
 
 ---
 
-## 5. 下一步
+## 6. 下一步
 
 从 **P2-P01** 开始：
 
 1. 让 plugin options 复用 core `I18nextKitConfig`
-2. 给 `i18nextKit()` 返回值标注 Vite `Plugin`
+2. 按 **第 2 节**骨架实现 `i18nextKit()`，返回值标注为 Vite `Plugin`
 3. 写最小 plugin 单测，锁住 `name` 和 options 类型
 4. 再进入 P2-P02：`buildStart()` 首次生成
+5. 并行准备 **第 2.7 节**：建好 `test-i18nextKit`，接上 **第 2.6 节** `vite-plugin-inspect`，用 **第 2.5 节**的 watch + `file:` 循环做真机调试；能力齐备后走 **P2-P08** 验收
 
 ---
 
-## 6. Phase 3 提示（更远的未来）
+## 7. Phase 3 提示（更远的未来）
 
 仅列提醒，不做规划：
 

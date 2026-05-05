@@ -5,16 +5,16 @@ import i18n, {
   type InitOptions,
   type Resource,
   type ResourceKey,
-} from 'i18next';
-import { initReactI18next } from 'react-i18next';
-import { defaultNS, resourceNamespaces } from './generated-resources';
-import './contracts';
+} from "i18next";
+import { initReactI18next } from "react-i18next";
+import { defaultNS, resourceNamespaces } from "./generated-resources";
+import "./contracts";
 
 const modules: Record<string, unknown> = import.meta.glob(
-    './{en-US,zh-CN,zh-HK}/*.ts',
-    { eager: true },
-  );
-const resources: Resource = { 'en-US': {}, 'zh-CN': {}, 'zh-HK': {} };
+  "./{en-US,zh-CN,zh-HK}/*.ts",
+  { eager: true }
+);
+const resources: Resource = { "en-US": {}, "zh-CN": {}, "zh-HK": {} };
 for (const p in modules) {
   if (Object.hasOwn(modules, p)) {
     const match = p.match(/^\.\/(en-US|zh-CN|zh-HK)\/(.+)\.ts$/);
@@ -28,13 +28,13 @@ for (const p in modules) {
 }
 
 export function initI18n(
-  options?: Omit<InitOptions, 'resources' | 'defaultNS' | 'ns'>,
+  options?: Omit<InitOptions, "resources" | "defaultNS" | "ns">
 ) {
   return i18n.use(initReactI18next).init({
     resources,
     defaultNS,
     ns: Object.keys(resourceNamespaces),
-    fallbackLng: 'en-US',
+    fallbackLng: "en-US",
     interpolation: { escapeValue: false },
     ...options,
   });
