@@ -129,4 +129,28 @@ describe("generateAll", () => {
     });
     expect(result.writtenFiles).toHaveLength(4);
   });
+
+  it("仅有空 base 与缺失 locale 目录时一次性返回合并后的校验问题", () => {
+    root = mkdtempSync(join(tmpdir(), "i18next-kit-orchestrate-partial-"));
+    const i18nDir = join(root, "src", "i18n");
+    const baseDir = join(i18nDir, "base");
+    mkdirSync(baseDir, { recursive: true });
+
+    const result = generateAll({
+      root,
+      i18nDir: "src/i18n",
+      locales: ["en-US", "zh-CN"],
+      mode: "folder",
+    });
+
+    expect(result.validation.ok).toBe(false);
+    expect(result.validation.issues).toEqual(
+      expect.arrayContaining([
+        { code: "NO_CONTRACT_NAMESPACE", locale: "", namespace: "" },
+        { code: "LOCALE_DIR_MISSING", locale: "en-US", namespace: "" },
+        { code: "LOCALE_DIR_MISSING", locale: "zh-CN", namespace: "" },
+      ])
+    );
+    expect(result.validation.issues).toHaveLength(3);
+  });
 });

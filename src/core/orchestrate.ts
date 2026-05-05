@@ -25,8 +25,16 @@ export function generateAll(userConfig: I18nextKitConfig): GenerateResult {
   const config = resolveConfig(userConfig);
 
   const namespaces = scanContracts(config.contractsDir);
-  const localeFiles = scanLocalesFolder(config.i18nDir, [...config.locales]);
-  const validation = validate(namespaces, localeFiles, [...config.locales]);
+  const { files: localeFiles, missingLocaleDirs } = scanLocalesFolder(
+    config.i18nDir,
+    [...config.locales]
+  );
+  const validation = validate(
+    namespaces,
+    localeFiles,
+    [...config.locales],
+    missingLocaleDirs
+  );
 
   const written: string[] = [];
   const artifacts: [string, string][] = [

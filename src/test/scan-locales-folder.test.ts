@@ -54,7 +54,7 @@ describe("scanLocalesFolder", () => {
 
     const result = scanLocalesFolder(root, []);
 
-    expect(result).toEqual([]);
+    expect(result).toEqual({ files: [], missingLocaleDirs: [] });
   });
 
   it("单个语言目录：只收录 .ts，去掉扩展名；排除 .d.ts 与非 .ts", () => {
@@ -76,12 +76,13 @@ describe("scanLocalesFolder", () => {
     // 扫描 i18n 目录下的 en-US 目录
     const result = scanLocalesFolder(i18nDir, ["en-US"]);
     // 对扫描结果进行排序
-    expect(sortEntries(result)).toEqual(
+    expect(sortEntries(result.files)).toEqual(
       sortEntries([
         { locale: "en-US", namespace: "common" },
         { locale: "en-US", namespace: "user-management" },
       ])
     );
+    expect(result.missingLocaleDirs).toEqual([]);
   });
 
   it("多个语言目录：按 locales 顺序遍历，合并为 locale + namespace 列表", () => {
@@ -99,13 +100,14 @@ describe("scanLocalesFolder", () => {
 
     const result = scanLocalesFolder(i18nDir, ["zh-CN", "en-US", "zh-HK"]);
 
-    expect(sortEntries(result)).toEqual(
+    expect(sortEntries(result.files)).toEqual(
       sortEntries([
         { locale: "zh-CN", namespace: "a" },
         { locale: "en-US", namespace: "b" },
         { locale: "zh-HK", namespace: "c" },
       ])
     );
+    expect(result.missingLocaleDirs).toEqual([]);
   });
 
   it("某语言目录下无 .ts 源文件时，该语言不产生条目", () => {
@@ -115,7 +117,23 @@ describe("scanLocalesFolder", () => {
     mkdirSync(ja, { recursive: true });
     writeFileSync(join(ja, "only.d.ts"), "export {}");
 
-    expect(scanLocalesFolder(i18nDir, ["ja-JP"])).toEqual([]);
+    expect(scanLocalesFolder(i18nDir, ["ja-JP"])).toEqual({
+      files: [],
+      missingLocaleDirs: [],
+    });
+  });
+
+  it("locale 子目录不存在时记入 missingLocaleDirs", () => {
+    root = join(tmpdir(), `scan-locales-missing-${Date.now()}`);
+    const i18nDir = join(root, "i18n");
+    mkdirSync(join(i18nDir, "en-US"), { recursive: true });
+    writeFileSync(join(i18nDir, "en-US", "common.ts"), "export default {}");
+
+    const result = scanLocalesFolder(i18nDir, ["en-US", "zh-CN"]);
+    expect(sortEntries(result.files)).toEqual([
+      { locale: "en-US", namespace: "common" },
+    ]);
+    expect(result.missingLocaleDirs).toEqual(["zh-CN"]);
   });
 
   it("遍历每个 locale 目录，返回（locale, namespace）对", () => {
@@ -134,7 +152,7 @@ describe("scanLocalesFolder", () => {
     }
 
     const reuslt = scanLocalesFolder(root, locales);
-    expect(reuslt).toEqual(
+    expect(reuslt.files).toEqual(
       expect.arrayContaining([
         {
           locale: "en-US",
@@ -174,5 +192,6 @@ describe("scanLocalesFolder", () => {
         },
       ])
     );
+    expect(reuslt.missingLocaleDirs).toEqual([]);
   });
 });

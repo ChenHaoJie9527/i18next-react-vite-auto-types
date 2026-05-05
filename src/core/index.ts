@@ -4,7 +4,11 @@ export { emitResources } from "./emit/resources";
 export { emitRuntime } from "./emit/runtime";
 export { type GenerateResult, generateAll } from "./orchestrate";
 export { scanContracts } from "./scan-contracts";
-export { scanLocalesFolder } from "./scan-locales-folder";
+export {
+  type LocaleScanEntry,
+  type ScanLocalesFolderResult,
+  scanLocalesFolder,
+} from "./scan-locales-folder";
 export {
   type I18nextKitConfig,
   I18nextKitError,

@@ -99,4 +99,39 @@ describe("validate", () => {
       ],
     });
   });
+
+  it("契约为空时报告 NO_CONTRACT_NAMESPACE，并仍可报告缺失的 locale 目录", () => {
+    const report = validate([], [], ["en-US", "zh-CN"], ["en-US", "zh-CN"]);
+
+    expect(report.ok).toBe(false);
+    expect(report.issues).toEqual([
+      {
+        code: "NO_CONTRACT_NAMESPACE",
+        locale: "",
+        namespace: "",
+      },
+      {
+        code: "LOCALE_DIR_MISSING",
+        locale: "en-US",
+        namespace: "",
+      },
+      {
+        code: "LOCALE_DIR_MISSING",
+        locale: "zh-CN",
+        namespace: "",
+      },
+    ]);
+  });
+
+  it("locale 目录缺失时不重复产生 MISSING_LOCALE_FILE", () => {
+    const report = validate([{ name: "common" }], [], ["en-US"], ["en-US"]);
+
+    expect(report.issues).toEqual([
+      {
+        code: "LOCALE_DIR_MISSING",
+        locale: "en-US",
+        namespace: "",
+      },
+    ]);
+  });
 });

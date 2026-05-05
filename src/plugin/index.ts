@@ -10,7 +10,7 @@ import {
   type DevErrorFlag,
   logFatalAndMaybeRethrow,
 } from "./run-generate";
-import { attachKitFsWatcher } from "./watch";
+import { attachKitFsWatcher, registerKitWatchTargets } from "./watch";
 
 export type I18nextKitPluginOptions = I18nextKitConfig;
 
@@ -24,6 +24,9 @@ export function i18nextKit(options: I18nextKitPluginOptions): Plugin {
   const devError: DevErrorFlag = { hadCatchError: false };
 
   const runGenerate = () => {
+    if (command === "serve" && devServer) {
+      registerKitWatchTargets(devServer, () => mergedConfig);
+    }
     try {
       const result = generateAll(mergedConfig);
       resolvedCache = resolveConfig(mergedConfig);
@@ -58,6 +61,10 @@ export function i18nextKit(options: I18nextKitPluginOptions): Plugin {
     },
     configureServer(server) {
       devServer = server;
+      registerKitWatchTargets(server, () => mergedConfig);
+      queueMicrotask(() => {
+        registerKitWatchTargets(server, () => mergedConfig);
+      });
       const stopWatch = attachKitFsWatcher(
         server,
         () => mergedConfig,

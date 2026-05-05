@@ -31,12 +31,7 @@ export function scanContracts(dir: string) {
       };
     });
 
-  if (result.length === 0) {
-    throw new I18nextKitError("EMPTY_CONTRACTS", `契约目录为空：${dir}`, {
-      dir,
-    });
-  }
-
+  // 空目录不抛错：交给 validate 产出 NO_CONTRACT_NAMESPACE，并继续扫描 locale 以合并提示
   return result;
 }
 

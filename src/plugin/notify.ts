@@ -7,10 +7,19 @@ import type { ValidationIssue, ValidationReport } from "../core/validate";
  * @param issues - 校验问题列表
  * @returns - 格式化后的校验问题列表
  */
+function formatIssue(i: ValidationIssue): string {
+  switch (i.code) {
+    case "NO_CONTRACT_NAMESPACE":
+      return `  - ${i.code}: 契约目录下至少需要有一个命名空间 .ts 文件`;
+    case "LOCALE_DIR_MISSING":
+      return `  - ${i.code}: 缺少 locale 子目录（在 i18n 根下创建 ${i.locale}/）`;
+    default:
+      return `  - ${i.code}: locale=${i.locale} namespace=${i.namespace}`;
+  }
+}
+
 function formatIssues(issues: ValidationIssue[]): string {
-  return issues
-    .map((i) => `  - ${i.code}: locale=${i.locale} namespace=${i.namespace}`)
-    .join("\n");
+  return issues.map(formatIssue).join("\n");
 }
 
 /**
@@ -66,11 +75,6 @@ export function sendValidationOverlay(
 }
 
 /**
- * 发送致命错误到 ws overlay
- * @param server - dev server
- * @param error - 错误
- */
-/**
  * 发送空 HMR update，触发客户端 `clearErrorOverlay()`（与 Vite 内置行为一致）。
  */
 export function clearDevOverlay(server: ViteDevServer | undefined) {
@@ -83,6 +87,11 @@ export function clearDevOverlay(server: ViteDevServer | undefined) {
   });
 }
 
+/**
+ * 发送致命错误到 ws overlay
+ * @param server - dev server
+ * @param error - 错误
+ */
 export function sendFatalOverlay(
   server: ViteDevServer | undefined,
   error: unknown

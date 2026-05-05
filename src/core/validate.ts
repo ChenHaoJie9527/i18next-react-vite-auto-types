@@ -5,7 +5,11 @@
  * @namespace - namespace 名称
  */
 export type ValidationIssue = {
-  code: "MISSING_LOCALE_FILE" | "EXTRA_LOCALE_FILE";
+  code:
+    | "MISSING_LOCALE_FILE"
+    | "EXTRA_LOCALE_FILE"
+    | "NO_CONTRACT_NAMESPACE"
+    | "LOCALE_DIR_MISSING";
   locale: string;
   namespace: string;
 };
@@ -37,15 +41,37 @@ type LocaleFile = {
  * @param namespace - namespace 列表
  * @param localeFiles - locale 文件列表
  * @param locales - locales 列表
+ * @param missingLocaleDirs - 配置中存在但磁盘上未创建的 locale 子目录
  * @returns - 校验报告
  */
 export function validate(
   namespace: Namespace[],
   localeFiles: LocaleFile[],
-  locales: string[]
+  locales: string[],
+  missingLocaleDirs: string[] = []
 ) {
   // 存储校验问题列表
   const issues: ValidationIssue[] = [];
+  const missingDirSet = new Set(missingLocaleDirs);
+
+  if (namespace.length === 0) {
+    issues.push({
+      code: "NO_CONTRACT_NAMESPACE",
+      locale: "",
+      namespace: "",
+    });
+  }
+
+  for (const locale of locales) {
+    if (missingDirSet.has(locale)) {
+      issues.push({
+        code: "LOCALE_DIR_MISSING",
+        locale,
+        namespace: "",
+      });
+    }
+  }
+
   // 存储已经存在的 locale 文件
   const have = new Set(
     localeFiles.map((file) => `${file.locale}::${file.namespace}`)
@@ -54,6 +80,9 @@ export function validate(
   const expected = new Set<string>();
 
   for (const locale of locales) {
+    if (missingDirSet.has(locale)) {
+      continue;
+    }
     for (const ns of namespace) {
       const key = `${locale}::${ns.name}`;
       expected.add(key);
