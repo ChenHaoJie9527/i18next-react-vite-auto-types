@@ -2,6 +2,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -67,5 +68,57 @@ describe("prepareI18nScaffold（经 generateAll 默认路径）", () => {
     expect(existsSync(join(alt, "base", "common.ts"))).toBe(true);
     expect(existsSync(join(alt, "en-US", "common.ts"))).toBe(true);
     expect(result.validation.ok).toBe(true);
+  });
+
+  it("最小模板后新增 base/user 并补齐三语言时 contracts.ts 引入 UserMessage", () => {
+    root = mkdtempSync(join(tmpdir(), "i18next-kit-scaffold-user-ns-"));
+    const locales = ["en-US", "zh-CN", "zh-HK"] as const;
+
+    generateAll({
+      root,
+      i18nDir: "src/i18n",
+      locales: [...locales],
+      mode: "folder",
+    });
+
+    const i18n = join(root, "src", "i18n");
+    const baseUser = `export type UserMessage = {
+  label: string;
+};
+`;
+    writeFileSync(join(i18n, "base", "user.ts"), baseUser, "utf-8");
+
+    for (const loc of locales) {
+      const hello = loc === "en-US" ? "User" : "用户";
+      writeFileSync(
+        join(i18n, loc, "user.ts"),
+        `import type { UserMessage } from "../base/user";
+
+export default {
+  label: ${JSON.stringify(hello)},
+} satisfies UserMessage;
+`,
+        "utf-8"
+      );
+    }
+
+    const second = generateAll({
+      root,
+      i18nDir: "src/i18n",
+      locales: [...locales],
+      mode: "folder",
+      scaffold: false,
+    });
+
+    expect(second.validation.ok).toBe(true);
+    const contracts = readFileSync(join(i18n, "contracts.ts"), "utf-8");
+    console.log("contracts=>", contracts);
+    expect(contracts).toContain(
+      "import type { UserMessage } from './base/user'"
+    );
+    expect(contracts).toContain("user: UserMessage");
+    expect(contracts).toMatch(/enUSUser/);
+    expect(contracts).toMatch(/zhCNUser/);
+    expect(contracts).toMatch(/zhHKUser/);
   });
 });
