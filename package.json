@@ -35,7 +35,7 @@
     "dev:run": "tsx scripts/dev-run.ts"
   },
   "type": "module",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Type-safe i18next toolkit for Vite + React: scaffold,scan,and generate namespaces & types.",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
