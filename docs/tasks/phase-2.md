@@ -5,15 +5,33 @@
 
 ---
 
+## 0. 当前仓库状态（插件已重置，2026-05）
+
+为便于 **v0.2 按 `docs/testing/v2.md` 自底向上重做**，`src/plugin/` 已收敛为**仅一个文件**：
+
+| 路径 | 状态 |
+|------|------|
+| `src/plugin/index.ts` | **空壳**：`i18nextKit(options)` 只返回 `{ name: "i18next-kit" }`，`I18nextKitPluginOptions` 等同 `I18nextKitConfig`。 |
+
+以下模块**已删除**，文中任务（P2-P02～P2-P05）描述的是**待重新实现**的目标；实现时可按 v2 约定拆到 `core`（纯逻辑）或 `src/plugin` 下新文件，**不必**恢复旧文件名（`paths.ts` / `hmr.ts` / `notify.ts` 等）。
+
+- 已移除的插件侧文件（历史）：`hmr.ts`、`paths.ts`、`watch.ts`、`notify.ts`、`run-generate.ts`、`i18n-sources-watcher.ts`
+- 已移除的插件相关单测：`plugin-watch.test.ts`、`plugin-paths.test.ts`、`i18n-sources-watcher.test.ts`
+- **依赖**：`chokidar` 已从本包 `dependencies` 移除；若 v2 采用 chokidar 专职监听，再按需加回。
+
+**产品方向补充**：详见 `docs/testing/v2.md`（`framework`、base↔locale 同步、MVP 静默体验等）。与下文 **P2-P05「overlay」** 冲突时，**以 v2 当前决策为准**（MVP 可先不做 overlay，后续再开关）。
+
+---
+
 ## 1. 整体定位
 
-Phase 2 的 Plugin 代码是**薄壳**：真正的扫描、校验、生成、写文件都继续放在 `core`。
+Phase 2 的 Plugin 代码应是**薄壳**：真正的扫描、校验、生成、写文件都继续放在 `core`（base↔locale 同步等新增逻辑也优先放 `core`，插件只编排）。
 
-Plugin 只负责三件事：
+Plugin 负责（目标能力，**当前空壳尚未实现**）：
 
-1. 决定什么时候调用 `generateAll`
-2. 把错误和 validation 结果映射到 Vite dev/build 体验
-3. 避免生成文件触发 HMR 死循环
+1. 决定什么时候调用 `generateAll`（及 v2 下的 locale 同步等前置步骤）
+2. 把错误和 validation 结果映射到 Vite dev/build 体验（v2 MVP 可先弱化）
+3. 避免生成文件触发 HMR / 监听死循环
 
 核心生命周期：
 
@@ -40,9 +58,9 @@ buildEnd(error)
 关键边界：
 
 - `core` 不 import Vite
-- `plugin` 不重新实现扫描/生成
+- `plugin` 不重新实现扫描/生成（编排 + 调用 `generateAll`）
 - `plugin` 可以依赖 `generateAll` 返回的 `writtenFiles` 和 `validation`
-- `plugin` 开发态尽量不中断 dev server，构建态遇到 validation 错误应失败
+- dev 尽量不杀 server；**build 是否因 validation 失败** 以 v2 / 发布前约定为准（MVP 可先放宽）
 
 ---
 
@@ -126,7 +144,7 @@ export default defineConfig({
 
 | 环节 | 做法 |
 |------|------|
-| **实现** | 只在 `src/plugin/**/*.ts`（及抽离的 `paths.ts` / `hmr.ts` 等）写钩子逻辑；业务仍调用 `generateAll`。 |
+| **实现** | 在 `src/plugin/index.ts`（及后续按需新增的少量同目录文件）写 Vite 钩子；**纯路径/防抖/同步逻辑**可放 `src/core`。业务仍调用 `generateAll`。 |
 | **类型** | `import type { Plugin } from "vite"`；勿在 `core` 中 `import "vite"`。 |
 | **产物** | 本仓库 `pnpm dev` 对应 `vite build --watch`（见根目录 `package.json`），持续更新 `dist/index.js` 与 `dist/index.d.ts`。宿主项目应依赖 **已构建的 dist**，不要 `import` 本仓库的 `src/`。 |
 | **调试（无 UI）** | 宿主目录执行 `pnpm exec vite --debug` 或设置环境变量（见 [Vite 调试](https://vite.dev/guide/troubleshooting.html)），观察钩子顺序与重复执行次数。 |
@@ -205,8 +223,8 @@ pnpm add -D file:/Users/you/path/to/i18next-react-vite-auto-types
 
 1. 终端 A：在本包根目录 `pnpm dev`（生成 watch 中的 `dist`）。  
 2. 终端 B：在 `test-i18nextKit` 根目录 `pnpm dev`。  
-3. 改本包 `src/plugin` → 保存 → 确认 `dist` 更新 → 视情况重启终端 B。  
-4. 用 `__inspect/` 确认 `i18next-kit` 钩子执行是否符合预期；用浏览器 + 改 i18n 源文件验证 HMR 与生成物。
+3. 改本包 `src/plugin`（当前仅 `index.ts` 空壳，接入逻辑后再验证）→ 保存 → 确认 `dist` 更新 → 视情况重启终端 B。  
+4. 用 `__inspect/` 确认 `i18next-kit` 钩子执行是否符合预期；用浏览器 + 改 i18n 源文件验证监听与生成物。
 
 **5）若将来把宿主收进本 monorepo**
 
@@ -221,12 +239,14 @@ pnpm add -D file:/Users/you/path/to/i18next-react-vite-auto-types
 | 文件 | 目标 |
 |---|---|
 | `src/plugin/index.ts` | `i18nextKit(options)` 复用 core 的 `I18nextKitConfig` |
-| `src/core/types.ts` | 如有需要，导出插件可复用的配置类型 |
+| `src/core/types.ts` | 如有需要，导出插件可复用的配置类型（含 v2 的 `framework` 等） |
 
-第一步保证 **options 类型与 core 一致**，不在 plugin 里重复维护一份配置 interface。`src/plugin/index.ts` 中应为：
+第一步保证 **options 类型与 core 一致**，不在 plugin 里重复维护一份配置 interface。
+
+**当前进度**：空壳已满足下列写法；后续字段在 `types.ts` 扩展即可。
 
 ```ts
-import type { I18nextKitConfig } from "../core";
+import type { I18nextKitConfig } from "../core/types";
 
 export type I18nextKitPluginOptions = I18nextKitConfig;
 ```
@@ -237,37 +257,38 @@ export type I18nextKitPluginOptions = I18nextKitConfig;
 - plugin 不再维护和 core 重复的配置字段
 - `pnpm typecheck` 通过
 
+**待补**：可选的最小单测（断言 `i18nextKit(...).name === 'i18next-kit'`），与下文 P2-P07 一并验收亦可。
+
 ### P2-P02. 插件首次生成
 
-目标：Vite 启动 dev server 或 build 时，先跑一次 `generateAll`。
+目标：Vite 启动 dev server 或 build 时，先跑一次 `generateAll`（v2 下可在其前插入 base↔locale 同步，见 `docs/testing/v2.md`）。
 
-涉及文件：
+涉及文件（**待实现**，名称可调整）：
 
 ```text
-src/plugin/index.ts
-src/plugin/lifecycle.ts
-src/plugin/notify.ts
+src/plugin/index.ts          # 挂 buildStart / configResolved
+# 可选：src/core/...         # 若抽出「应用生成结果」的纯函数，便于单测
+# 可选：轻量日志模块         # v2 MVP 可先省略终端/overlay
 ```
+
+> 历史文档曾写 `lifecycle.ts` / `notify.ts`，已随插件重置删除；重建时不必沿用旧文件名。
 
 实现要点：
 
-- `configResolved(viteConfig)` 中保存 Vite root
-- 用户未传 `root` 时使用 `viteConfig.root`
-- `buildStart()` 调用 `generateAll(resolvedOptions)`
-- 终端打印写入文件和 validation warning
-- build 模式下 validation 不通过时抛错，让构建失败
-- dev 模式下 validation 不通过时只 warning，dev server 继续活着
+- `configResolved(viteConfig)` 中保存 Vite `command`，合并 `options.root ?? viteConfig.root`
+- `buildStart()` 调用 `prepareI18nScaffold`（若仍启用）+ `generateAll({ ... , scaffold: false })`
+- 终端与 validation 行为：**默认以 `docs/testing/v2.md` 为准**（MVP 可静默）；若与下列旧验收冲突，先满足 v2 再补严格模式
+- build 模式下 validation 不通过时是否抛错：v2 暂可放宽，后续再与 CI 对齐
 
-验收：
+验收（建议）：
 
-- 单测覆盖 `buildStart` 会调用生成流程
-- validation ok 时不报错
-- build 模式 validation fail 时抛错
-- dev 模式 validation fail 时不抛错
+- 集成或单测覆盖：注册插件后 `buildStart` 会触发 `generateAll`（可用 mock）
+- validation ok 时不应出现未处理异常
+- build / dev 下错误策略与 v2 文档一致
 
-### P2-P03. HMR 文件匹配
+### P2-P03. 源文件匹配（HMR / chokidar 共用）
 
-目标：只在 i18n 源文件变化时重新生成。
+目标：只在 i18n **契约与 locale 源文件**变化时驱动重新生成（或先跑 v2 的 locale 同步）。
 
 需要识别：
 
@@ -276,7 +297,7 @@ contractsDir/**/*.ts
 i18nDir/<locale>/**/*.ts
 ```
 
-需要忽略：
+需要忽略（生成物，位于 `outDir` 下）：
 
 ```text
 generated-resources.ts
@@ -287,68 +308,71 @@ i18next.d.ts
 
 实现建议：
 
-- 新建 `src/plugin/paths.ts`
-- 基于 `resolveConfig(options)` 算出绝对路径
-- 提供 `isSourceFile(file)` / `isGeneratedFile(file)`
-- 不引入 chokidar，直接使用 Vite `handleHotUpdate(ctx.file)`
+- **推荐**：在 `src/core/` 新增纯函数模块（如 `source-paths.ts`），导出 `normalizePath`、`isSourceFile`、`isGeneratedFile`，基于 `ResolvedConfig` 与绝对路径判断
+- **触发方式**（二选一或并存，见 v2）：
+  - Vite `handleHotUpdate(ctx.file)`（对已进模块图的文件有效）
+  - **chokidar** 监听 `contractsDir`、各 locale 目录及 `i18n` 根（专职补「新建文件未进 HMR」场景）
 
 验收：
 
-- `base/common.ts` 返回 true
-- `en-US/common.ts` 返回 true
-- `contracts.ts` 返回 false
-- 非 i18n 文件返回 false
+- `base/common.ts` → source
+- `en-US/common.ts` → source
+- `outDir/contracts.ts` → generated，非 source
+- 非 i18n 树内文件 → false
 
-### P2-P04. HMR 防抖与重新生成
+> 对应单测在插件重置时已删除，重建模块后应补回（可放在 `src/test/`，针对 `core` 路径判定）。
 
-目标：开发态保存文件时，合并短时间内的多次事件，只执行一次 `generateAll`。
+### P2-P04. 防抖与重新生成
+
+目标：开发态保存文件时，合并短时间内的多次事件，只执行一次「同步（若启用）+ `generateAll`」。
 
 实现建议：
 
-- 新建 `src/plugin/hmr.ts`
-- debounce 100ms
-- `handleHotUpdate(ctx)` 中：
-  - 先过滤 generated 文件
-  - 再判断是否是 source 文件
-  - 命中后调度重新生成
-  - 返回 `[]` 或让 Vite 继续默认 HMR，需要结合实际验证
+- **debounce** 可内联于 `index.ts` 或放在 `src/core/debounce.ts`（纯工具，无 Vite）
+- 间隔建议 **100ms**（与旧实现一致，可调）
+- `handleHotUpdate` / chokidar 回调中：先过滤生成物，再判断 source，命中后 `scheduleRegenerate()`
+- 返回 `[]` 与否：以避免生成物参与无意义 HMR 为准，需联调验证
 
 验收：
 
-- 连续触发多个源文件变化，只调用一次生成
-- 生成文件变化不会触发下一轮生成
-- 手动改 base 文件后产物刷新
+- 连续触发多个源文件变化，合并为一次生成
+- 生成文件变化不触发下一轮生成
+- 改 base / locale 源文件后产物刷新
 
-### P2-P05. Dev Overlay 与终端通知
+> 历史 `src/plugin/hmr.ts` 已删除；重建时不必恢复同名文件。
+
+### P2-P05. Dev 诊断（Overlay / 终端）
 
 目标：开发态错误可见，但不轻易杀 dev server。
 
-错误分类：
+**与 v2 对齐**：`docs/testing/v2.md` 约定 MVP **暂不**做强终端错误与 **overlay**；本节保留为 **Phase 2 完整版 / 后续迭代** 目标，实现时可做 `diagnostics: 'full' | 'none'` 一类开关。
+
+错误分类（完整版）：
 
 ```text
 I18nextKitError fatal:
   CONTRACTS_DIR_NOT_FOUND
-  EMPTY_CONTRACTS
-  INVALID_CONFIG
+  …（以 core 为准）
 
-Validation warning:
+Validation:
   MISSING_LOCALE_FILE
   EXTRA_LOCALE_FILE
+  …
 ```
 
-实现建议：
+实现建议（完整版）：
 
-- `notifySuccess(result)`
-- `notifyValidationIssues(result.validation)`
-- `notifyFatalError(error)`
-- dev 下使用 `server.ws.send({ type: 'error', err: { message, stack } })`
-- build 下 fatal/validation fail 抛错
+- 轻量 `logGenerateResult`（写入文件列表）
+- validation / fatal 映射到终端与 `server.ws.send` overlay
+- build 下 fatal / validation fail 抛错
 
-验收：
+验收（完整版）：
 
-- 终端能看到生成文件和 warning
-- dev 下 validation fail 出现 overlay 或终端 warning
+- 终端可看到生成与 warning
+- dev 下 validation fail 有可见反馈
 - build 下 validation fail 失败
+
+**MVP（当前 v2）**：可先仅 `console.info` 成功写入（可选），不做 overlay。
 
 ### P2-P06. Example Basic
 
@@ -364,11 +388,11 @@ examples/basic/
 
 验收：
 
-- `examples/basic` 中 `pnpm dev` 能启动
-- 首次启动自动生成 4 个文件
-- 修改 `src/i18n/base/common.ts` 后自动重新生成
-- 删除某个 locale 文件后出现 warning/overlay
-- `pnpm build` 在 validation fail 时失败
+- `examples/basic` 中 `pnpm dev` 能启动（插件实现 P2-P02 后）
+- 首次启动自动生成 4 个产物文件
+- 修改 `src/i18n/base/common.ts` 后自动重新生成（监听实现后）
+- 删除某个 locale 文件后的提示方式与 **v2 MVP** 一致（可无 overlay）
+- `pnpm build` 是否在 validation fail 时失败：与 v2 / 团队约定一致
 
 ### P2-P07. Plugin Build 输出验证
 
@@ -406,26 +430,27 @@ CLI 放到 Plugin MVP 后面。原因：
 
 ## 5. Plugin MVP 交付标准
 
-完成 Phase 2 后应该能达到：
+完成 Phase 2（并与 v2 合并验收）后应能达到：
 
-1. `examples/basic/` 里 `pnpm dev`，浏览器能看到"Hello World"
-2. 修改 `base/common.ts` 加一个 key → 热更新自动重新生成 → 组件里 `t('newKey')` 有提示
-3. 故意删掉 `zh-CN/common.ts` → 浏览器 overlay 出现红色错误，但页面仍然可交互
-4. `pnpm build` → 若有 validation 错误，构建失败
-5. `pnpm build` 后包入口导出和类型完整
-6. **`test-i18nextKit`（或等价宿主）**：`file:` 安装本包 + `vite-plugin-inspect`，能在 `__inspect` 中确认 `i18next-kit` 行为，并完成与 **第 2.5～2.7 节**一致的日常联调循环
+1. `examples/basic/`（或等价宿主）里 `pnpm dev` 能启动，插件非空壳：`buildStart` 至少执行 `generateAll`（及 v2 约定的同步逻辑）
+2. 修改契约 / locale 源文件 → **无需重启 dev** 即可反映到生成物（chokidar 或 HMR 路径满足其一即可，v2 以 chokidar 为主）
+3. 校验失败时的体验以 **`docs/testing/v2.md`** 为准（MVP 可先无 overlay）
+4. `pnpm build` 行为与 v2 / CI 约定一致（若 MVP 不 fail build，需在文档明确）
+5. `pnpm build` 后包入口导出 `i18nextKit` 与类型完整
+6. **`test-i18nextKit`（或等价宿主）**：`file:` + 可选 `vite-plugin-inspect`，在 `__inspect` 中能看到 `i18next-kit` 钩子
 
 ---
 
 ## 6. 下一步
 
-从 **P2-P01** 开始：
+**P2-P01** 已由空壳满足类型收敛；建议按 **`docs/testing/v2.md` §5 推荐顺序**继续：
 
-1. 让 plugin options 复用 core `I18nextKitConfig`
-2. 按 **第 2 节**骨架实现 `i18nextKit()`，返回值标注为 Vite `Plugin`
-3. 写最小 plugin 单测，锁住 `name` 和 options 类型
-4. 再进入 P2-P02：`buildStart()` 首次生成
-5. 并行准备 **第 2.7 节**：建好 `test-i18nextKit`，接上 **第 2.6 节** `vite-plugin-inspect`，用 **第 2.5 节**的 watch + `file:` 循环做真机调试；能力齐备后走 **P2-P08** 验收
+1. **`types` + `resolve-config`**：增加 `framework`、默认 `i18nDir` 等与 v2 一致的行为
+2. **`core`**：base↔locale 同步（增删改、重命名策略）
+3. **`src/plugin/index.ts`**：恢复 `buildStart` →（同步）→ `generateAll`；接入 **chokidar**（按需 `pnpm add chokidar`）与防抖；`configureServer` / `handleHotUpdate` 按 v2 取舍
+4. **诊断**：先 MVP 静默，再实现 P2-P05 完整版开关
+5. 补回 **路径判定 / watcher** 的单元测试（建议测 `core` 纯函数）
+6. 并行 **第 2.7 节** `test-i18nextKit` + **P2-P08** 联调闭环
 
 ---
 
