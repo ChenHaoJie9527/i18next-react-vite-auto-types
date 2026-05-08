@@ -1,3 +1,4 @@
+import { syncOneBaseFile } from "@/lib/sync-one-base-file";
 import type { ResolvedConfig } from "./types";
 
 export type BaseLocaleSyncChange =
@@ -32,4 +33,20 @@ export type BaseLocaleSyncResult = {
 export function syncLocales(
   config: ResolvedConfig,
   change: BaseLocaleSyncChange
-): BaseLocaleSyncResult {}
+): BaseLocaleSyncResult {
+  const result: BaseLocaleSyncResult = {
+    writtenFiles: [],
+    deletedFiles: [],
+    renamedFiles: [],
+  };
+
+  // 新增或变更
+  if (change.type === "add" || change.type === "change") {
+    const writtenFiles = syncOneBaseFile(config, change.file);
+    if (writtenFiles) {
+      result.writtenFiles.push(...writtenFiles);
+    }
+  }
+
+  return result;
+}

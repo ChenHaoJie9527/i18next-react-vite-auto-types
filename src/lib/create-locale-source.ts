@@ -4,8 +4,12 @@
  * @param typeName - 类型名称
  * @returns 创建的 locale 文件内容
  */
-export function createLocaleSource(namespace: string, typeName: string): string {
-  return `import type ${typeName} from "../base/${namespace}";    
+export function createLocaleSource(
+  namespace: string,
+  typeName: string
+): string {
+  return `import type { ${typeName} } from "../base/${namespace}";
 
-export default {} satisfies ${typeName};`;
+export default {} satisfies ${typeName};
+`;
 }
