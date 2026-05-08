@@ -42,7 +42,7 @@ type SharedConfig = {
   scaffold?: boolean;
 };
 
-export type I18nextKitFramework = 'vite' | 'next';
+export type I18nextKitFramework = "vite" | "next";
 
 type ConfigPaths = {
   root: string;

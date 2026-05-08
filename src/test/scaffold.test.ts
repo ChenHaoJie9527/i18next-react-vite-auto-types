@@ -112,7 +112,6 @@ export default {
 
     expect(second.validation.ok).toBe(true);
     const contracts = readFileSync(join(i18n, "contracts.ts"), "utf-8");
-    console.log("contracts=>", contracts);
     expect(contracts).toContain(
       "import type { UserMessage } from './base/user'"
     );
