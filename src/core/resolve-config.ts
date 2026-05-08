@@ -5,6 +5,9 @@ import {
   type ResolvedConfig,
 } from "./types";
 
+const DEFAULT_FRAMEWORK = "vite";
+const DEFAULT_I18N_DIR = "src/i18n";
+
 export function resolveConfig(config: I18nextKitConfig): ResolvedConfig {
   if (!Array.isArray(config.locales) || config.locales.length === 0) {
     throw new I18nextKitError("INVALID_CONFIG", "locales 不能为空数组");
@@ -20,7 +23,7 @@ export function resolveConfig(config: I18nextKitConfig): ResolvedConfig {
       "mode: 'file' 暂未实现，请使用 'folder' 模式"
     );
   }
-
+  const framework = resolveFramework(config.framework);
   const root = resolveRoot(config.root);
   const i18nDir = resolveI18nDir(root, config.i18nDir);
   const contractsDir = resolveContractsDir(i18nDir, config.contractsDir);
@@ -32,7 +35,25 @@ export function resolveConfig(config: I18nextKitConfig): ResolvedConfig {
     outDir,
     locales: config.locales,
     mode: config.mode,
+    framework,
   };
+}
+
+/**
+ * 如果 framework 为空，则使用 "vite"，否则使用传入的 framework
+ * @param framework - framework
+ * @returns framework
+ */
+function resolveFramework(framework: I18nextKitConfig["framework"]) {
+  if (!framework) {
+    return DEFAULT_FRAMEWORK;
+  }
+
+  if (framework !== "vite" && framework !== "next") {
+    throw new I18nextKitError("INVALID_CONFIG", `未知 framework: ${framework}`);
+  }
+
+  return framework;
 }
 
 /**
@@ -53,7 +74,7 @@ function resolveRoot(root: string | undefined) {
  * @returns i18n 目录的绝对路径
  */
 function resolveI18nDir(root: string, i18nDir: string | undefined) {
-  return resolve(root, i18nDir ?? "src/i18n");
+  return resolve(root, i18nDir ?? DEFAULT_I18N_DIR);
 }
 
 /**

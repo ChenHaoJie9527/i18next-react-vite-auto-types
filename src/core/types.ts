@@ -42,11 +42,14 @@ type SharedConfig = {
   scaffold?: boolean;
 };
 
+export type I18nextKitFramework = 'vite' | 'next';
+
 type ConfigPaths = {
   root: string;
   i18nDir: string;
   contractsDir: string;
   outDir: string;
+  framework: I18nextKitFramework;
 };
 
 export type I18nextKitConfig = SharedConfig & Partial<ConfigPaths>;

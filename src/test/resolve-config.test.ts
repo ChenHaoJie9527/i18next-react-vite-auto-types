@@ -67,6 +67,7 @@ describe("resolveConfig", () => {
       outDir: resolve(process.cwd(), "src/i18n"),
       locales: ["en-US"],
       mode: "folder",
+      framework: "vite",
     });
   });
 
@@ -82,6 +83,7 @@ describe("resolveConfig", () => {
       i18nDir: resolve("test", "src/i18n"),
       contractsDir: resolve("test", "src/i18n", "base"),
       outDir: resolve("test", "src/i18n"),
+      framework: "vite",
     });
   });
 
@@ -160,6 +162,7 @@ describe("resolveConfig", () => {
       outDir: "src/generated",
       locales: ["en-US", "zh-CN"],
       mode: "folder",
+      framework: "vite",
     });
 
     expect(result).toEqual({
@@ -169,6 +172,7 @@ describe("resolveConfig", () => {
       outDir: resolve("project", "src/generated"),
       locales: ["en-US", "zh-CN"],
       mode: "folder",
+      framework: "vite",
     });
   });
 });
