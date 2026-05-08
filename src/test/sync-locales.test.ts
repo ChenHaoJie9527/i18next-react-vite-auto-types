@@ -1,4 +1,10 @@
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -69,6 +75,30 @@ export default {} satisfies UserManagementMessage;
 
     for (const file of expectedFiles) {
       expect(readFileSync(file, "utf-8")).toBe(expectedContent);
+    }
+  });
+  it("删除时 删除对应的 locale 文件", () => {
+    const config = createConfig();
+    const baseFile = join(config.contractsDir, "base", "user-management.ts");
+    const expectedFiles = [
+      join(config.i18nDir, "en-US", "user-management.ts"),
+      join(config.i18nDir, "zh-CN", "user-management.ts"),
+    ];
+
+    for (const file of expectedFiles) {
+      mkdirSync(dirname(file), { recursive: true });
+      writeFileSync(file, "export default {};");
+    }
+
+    const result = syncLocales(config, { type: "unlink", file: baseFile });
+
+    expect(result).toEqual({
+      writtenFiles: [],
+      deletedFiles: expectedFiles,
+      renamedFiles: [],
+    });
+    for (const file of expectedFiles) {
+      expect(existsSync(file)).toBe(false);
     }
   });
 });

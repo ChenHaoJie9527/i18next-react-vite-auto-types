@@ -1,3 +1,4 @@
+import { deleteOneBaseFileLocales } from "@/lib/delete-one-base-file-locales";
 import { syncOneBaseFile } from "@/lib/sync-one-base-file";
 import type { ResolvedConfig } from "./types";
 
@@ -48,11 +49,14 @@ export function syncLocales(
     }
   }
 
-  if (change.type === 'unlink') {
-    // TODO: 删除对应的 locale 文件
+  if (change.type === "unlink") {
+    const deletedFiles = deleteOneBaseFileLocales(config, change.file);
+    if (deletedFiles) {
+      result.deletedFiles.push(...deletedFiles);
+    }
   }
 
-  if (change.type === 'rename') {
+  if (change.type === "rename") {
     // TODO: 重命名对应的 locale 文件
   }
 

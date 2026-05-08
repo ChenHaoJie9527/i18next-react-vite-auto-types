@@ -1,9 +1,9 @@
-import { describe, it, expect, afterEach } from "vitest";
-import { deleteOneBaseFileLocales } from "../lib/delete-one-base-file-locales";
-import { join } from "node:path";
-import type { ResolvedConfig } from "../core/types";
-import { existsSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
+import type { ResolvedConfig } from "../core/types";
+import { deleteOneBaseFileLocales } from "../lib/delete-one-base-file-locales";
 
 describe("deleteOneBaseFileLocales", () => {
   let root: string | undefined;
@@ -31,10 +31,21 @@ describe("deleteOneBaseFileLocales", () => {
   it("删除对应的 locale 文件", () => {
     const config = createConfig();
     const file = join(config.contractsDir, "base", "user-management.ts");
+    const expectedFiles = [
+      join(config.i18nDir, "en-US", "user-management.ts"),
+      join(config.i18nDir, "zh-CN", "user-management.ts"),
+    ];
 
-    deleteOneBaseFileLocales(config, file);
-    // 判断文件是否存在
-    expect(existsSync(join(config.i18nDir, "en-US", "user-management.ts"))).toBe(false);
-    expect(existsSync(join(config.i18nDir, "zh-CN", "user-management.ts"))).toBe(false);
+    for (const localeFile of expectedFiles) {
+      mkdirSync(dirname(localeFile), { recursive: true });
+      writeFileSync(localeFile, "export default {};");
+    }
+
+    const result = deleteOneBaseFileLocales(config, file);
+
+    expect(result).toEqual(expectedFiles);
+    for (const localeFile of expectedFiles) {
+      expect(existsSync(localeFile)).toBe(false);
+    }
   });
 });
