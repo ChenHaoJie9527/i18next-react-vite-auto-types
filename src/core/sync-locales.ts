@@ -48,5 +48,13 @@ export function syncLocales(
     }
   }
 
+  if (change.type === 'unlink') {
+    // TODO: 删除对应的 locale 文件
+  }
+
+  if (change.type === 'rename') {
+    // TODO: 重命名对应的 locale 文件
+  }
+
   return result;
 }
