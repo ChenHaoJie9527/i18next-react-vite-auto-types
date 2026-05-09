@@ -86,4 +86,15 @@ describe("renameOneBaseFileLocales", () => {
       ).toBeDefined();
     }
   });
-});
+
+  it("从未生成过 locale 文件时，每个 locale 目录下出现新的 to 路径， renameFiles 应该是 空数组", () => {
+    const config = createConfig();
+    const result = renameOneBaseFileLocales(config, "user.ts", "user-management.ts");
+    expect(result).toEqual([]);
+    for (const locale of config.locales) {
+      const newFile = join(config.i18nDir, locale, "user-management.ts");
+      // 判断新文件是否存在
+      expect(existsSync(newFile)).toBe(true);
+    }
+  });
+})
