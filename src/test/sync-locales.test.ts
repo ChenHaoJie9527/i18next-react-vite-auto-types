@@ -101,4 +101,34 @@ export default {} satisfies UserManagementMessage;
       expect(existsSync(file)).toBe(false);
     }
   });
+
+  it("重命名时 同步对应的 locale 文件", () => {
+    const config = createConfig();
+    const oldFile = join(config.contractsDir, "base", "user.ts");
+    const newFile = join(config.contractsDir, "base", "user-management.ts");
+
+    const expectedRenamedFiles = config.locales.map((locale) => ({
+      from: join(config.i18nDir, locale, "user.ts"),
+      to: join(config.i18nDir, locale, "user-management.ts"),
+    }));
+
+    // 创建旧文件
+    for (const { from } of expectedRenamedFiles) {
+      mkdirSync(dirname(from), { recursive: true });
+      writeFileSync(from, "export default {};");
+    }
+
+    // 将 base 目录下的 user.ts 重命名为 user-management.ts
+    const result = syncLocales(config, { type: "rename", oldFile, newFile });
+    console.log("result =>", result);
+    expect(result).toEqual({
+      writtenFiles: [],
+      deletedFiles: [],
+      renamedFiles: expectedRenamedFiles,
+    });
+    for (const { from, to } of expectedRenamedFiles) {
+      expect(existsSync(from)).toBe(false);
+      expect(existsSync(to)).toBe(true);
+    }
+  });
 });
