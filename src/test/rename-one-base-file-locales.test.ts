@@ -89,7 +89,11 @@ describe("renameOneBaseFileLocales", () => {
 
   it("从未生成过 locale 文件时，每个 locale 目录下出现新的 to 路径， renameFiles 应该是 空数组", () => {
     const config = createConfig();
-    const result = renameOneBaseFileLocales(config, "user.ts", "user-management.ts");
+    const result = renameOneBaseFileLocales(
+      config,
+      "user.ts",
+      "user-management.ts"
+    );
     expect(result).toEqual([]);
     for (const locale of config.locales) {
       const newFile = join(config.i18nDir, locale, "user-management.ts");
@@ -97,4 +101,32 @@ describe("renameOneBaseFileLocales", () => {
       expect(existsSync(newFile)).toBe(true);
     }
   });
-})
+
+  it("当 en-US 目录下有 user.ts 文件，zh-CN 目录下没有 user.ts 文件时，重命名后，en-US 目录下有 user-management.ts 文件，zh-CN 目录下有 user-management.ts 文件", () => {
+    const config = createConfig();
+    const enOldFile = join(config.i18nDir, "en-US", "user.ts");
+    const enNewFile = join(config.i18nDir, "en-US", "user-management.ts");
+    const zhOldFile = join(config.i18nDir, "zh-CN", "user.ts");
+    const zhNewFile = join(config.i18nDir, "zh-CN", "user-management.ts");
+
+    // 创建 en-US 旧文件
+    mkdirSync(dirname(enOldFile), { recursive: true });
+    writeFileSync(enOldFile, "export default {};");
+
+    const result = renameOneBaseFileLocales(config, 'user.ts', 'user-management.ts');
+
+    // 断言 enOldFile 是否不存在
+    expect(existsSync(enOldFile)).toBe(false)
+    // 断言 enNewFile 是否存在
+    expect(existsSync(enNewFile)).toBe(true)
+    // 断言 zhOldFile 是否不存在
+    expect(existsSync(zhOldFile)).toBe(false)
+    // 断言 zhNewFile 是否存在
+    expect(existsSync(zhNewFile)).toBe(true)
+    // 断言 result 的 renamedFiles 条数为 1
+    expect(result).toHaveLength(1)
+    // 断言 result的 from 和 to 是否为 enOldFile 和 enNewFile
+    expect(result?.[0].from).toBe(enOldFile)
+    expect(result?.[0].to).toBe(enNewFile)
+  });
+});
