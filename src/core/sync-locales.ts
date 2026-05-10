@@ -1,6 +1,8 @@
+import { join } from "node:path";
 import { deleteOneBaseFileLocales } from "@/lib/delete-one-base-file-locales";
 import { renameOneBaseFileLocales } from "@/lib/rename-one-base-file-locales";
 import { syncOneBaseFile } from "@/lib/sync-one-base-file";
+import { scanContracts } from "./scan-contracts";
 import type { ResolvedConfig } from "./types";
 
 export type BaseLocaleSyncChange =
@@ -13,6 +15,10 @@ export type BaseLocaleSyncResult = {
   writtenFiles: string[];
   deletedFiles: string[];
   renamedFiles: { from: string; to: string }[];
+};
+
+export type SyncAllBaseFilesResult = {
+  writtenFiles: string[];
 };
 
 /**
@@ -69,4 +75,28 @@ export function syncLocales(
   }
 
   return result;
+}
+
+/**
+ * 同步 base 目录下的所有文件到各 locale 目录。
+ * 适用于启动时的全量对齐，比如 Cli 或者 Vite dev 时，因为这是首次执行，所以没有变更，直接全量同步
+ *
+ * @param config - 配置
+ * @returns 全量同步结果
+ */
+export function syncAllBaseFiles(
+  config: ResolvedConfig
+): SyncAllBaseFilesResult {
+  const writtenFiles: string[] = [];
+  const namespaces = scanContracts(config.contractsDir);
+
+  for (const { name } of namespaces) {
+    const baseFile = join(config.contractsDir, `${name}.ts`);
+    const result = syncOneBaseFile(config, baseFile);
+    if (result?.length) {
+      writtenFiles.push(...result);
+    }
+  }
+
+  return { writtenFiles };
 }
