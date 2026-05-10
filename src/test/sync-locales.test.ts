@@ -8,7 +8,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { syncLocales } from "../core/sync-locales";
+import { syncAllBaseFiles, syncLocales } from "../core/sync-locales";
 import type { ResolvedConfig } from "../core/types";
 
 describe("syncLocales", () => {
@@ -129,6 +129,32 @@ export default {} satisfies UserManagementMessage;
     for (const { from, to } of expectedRenamedFiles) {
       expect(existsSync(from)).toBe(false);
       expect(existsSync(to)).toBe(true);
+    }
+  });
+
+  it("全量同步 base 目录下的所有文件", () => {
+    const config = createConfig();
+    const baseFiles = [
+      join(config.contractsDir, "common.ts"),
+      join(config.contractsDir, "user-management.ts"),
+    ];
+    const expectedFiles = [
+      join(config.i18nDir, "en-US", "common.ts"),
+      join(config.i18nDir, "zh-CN", "common.ts"),
+      join(config.i18nDir, "en-US", "user-management.ts"),
+      join(config.i18nDir, "zh-CN", "user-management.ts"),
+    ];
+
+    for (const file of baseFiles) {
+      mkdirSync(dirname(file), { recursive: true });
+      writeFileSync(file, "export type Message = {};");
+    }
+
+    const result = syncAllBaseFiles(config);
+
+    expect(result).toEqual({ writtenFiles: expectedFiles });
+    for (const file of expectedFiles) {
+      expect(existsSync(file)).toBe(true);
     }
   });
 });
