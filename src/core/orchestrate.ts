@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { syncAllBaseFiles } from "../lib/sync-all-base-files";
 import { assertResolvedI18nLayout } from "./assert-layout";
 import { emitContracts } from "./emit/contracts";
 import { emitDts } from "./emit/dts";
@@ -31,6 +32,7 @@ export function generateAll(userConfig: I18nextKitConfig): GenerateResult {
     assertResolvedI18nLayout(config);
   }
 
+  const syncResult = syncAllBaseFiles(config);
   const namespaces = scanContracts(config.contractsDir);
   const { files: localeFiles, missingLocaleDirs } = scanLocalesFolder(
     config.i18nDir,
@@ -43,7 +45,7 @@ export function generateAll(userConfig: I18nextKitConfig): GenerateResult {
     missingLocaleDirs
   );
 
-  const written: string[] = [];
+  const written: string[] = [...syncResult.writtenFiles];
   const artifacts: [string, string][] = [
     ["generated-resources.ts", emitResources(namespaces)],
     [

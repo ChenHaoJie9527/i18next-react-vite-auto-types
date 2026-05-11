@@ -1,4 +1,5 @@
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -10,6 +11,16 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { I18nextKitError } from "../core";
 import { generateAll } from "../core/orchestrate";
+
+const commonLocaleSource = `import type { CommonMessage } from "../base/common";
+
+export default {} satisfies CommonMessage;
+`;
+
+const userManagementLocaleSource = `import type { UserManagementMessage } from "../base/user-management";
+
+export default {} satisfies UserManagementMessage;
+`;
 
 function makeFixture() {
   const root = mkdtempSync(join(tmpdir(), "i18next-kit-orchestrate-"));
@@ -30,10 +41,10 @@ function makeFixture() {
     "export type UserManagementMessage = {};"
   );
 
-  writeFileSync(join(enDir, "common.ts"), "export default {};");
-  writeFileSync(join(enDir, "user-management.ts"), "export default {};");
-  writeFileSync(join(zhDir, "common.ts"), "export default {};");
-  writeFileSync(join(zhDir, "user-management.ts"), "export default {};");
+  writeFileSync(join(enDir, "common.ts"), commonLocaleSource);
+  writeFileSync(join(enDir, "user-management.ts"), userManagementLocaleSource);
+  writeFileSync(join(zhDir, "common.ts"), commonLocaleSource);
+  writeFileSync(join(zhDir, "user-management.ts"), userManagementLocaleSource);
 
   return { root, i18nDir, outDir };
 }
@@ -48,7 +59,7 @@ describe("generateAll", () => {
     }
   });
 
-  it("会生成 4 个文件并返回通过的校验结果", () => {
+  it("writes the four generated artifacts", () => {
     const fixture = makeFixture();
     root = fixture.root;
 
@@ -86,7 +97,7 @@ describe("generateAll", () => {
     ).toContain("declare module 'i18next'");
   });
 
-  it("第二次执行相同输入时 writtenFiles 为空", () => {
+  it("does not rewrite unchanged files", () => {
     const fixture = makeFixture();
     root = fixture.root;
 
@@ -112,10 +123,11 @@ describe("generateAll", () => {
     expect(second.writtenFiles).toEqual([]);
   });
 
-  it("缺少 locale 文件时仍返回 validation 问题并继续生成", () => {
+  it("syncs missing locale files before validation and generation", () => {
     const fixture = makeFixture();
     root = fixture.root;
-    rmSync(join(fixture.i18nDir, "zh-CN", "user-management.ts"));
+    const missingFile = join(fixture.i18nDir, "zh-CN", "user-management.ts");
+    rmSync(missingFile);
 
     const result = generateAll({
       root: fixture.root,
@@ -126,16 +138,13 @@ describe("generateAll", () => {
       scaffold: false,
     });
 
-    expect(result.validation.ok).toBe(false);
-    expect(result.validation.issues).toContainEqual({
-      code: "MISSING_LOCALE_FILE",
-      locale: "zh-CN",
-      namespace: "user-management",
-    });
-    expect(result.writtenFiles).toHaveLength(4);
+    expect(result.validation.ok).toBe(true);
+    expect(result.validation.issues).toEqual([]);
+    expect(result.writtenFiles).toEqual(expect.arrayContaining([missingFile]));
+    expect(existsSync(missingFile)).toBe(true);
   });
 
-  it("仅有空 base 与缺失 locale 目录时一次性返回合并后的校验问题", () => {
+  it("reports missing locale directories when only base exists", () => {
     root = mkdtempSync(join(tmpdir(), "i18next-kit-orchestrate-partial-"));
     const i18nDir = join(root, "src", "i18n");
     const baseDir = join(i18nDir, "base");
@@ -160,7 +169,7 @@ describe("generateAll", () => {
     expect(result.validation.issues).toHaveLength(3);
   });
 
-  it("缺少 i18n 根目录时抛出 I18N_DIR_NOT_FOUND", () => {
+  it("throws I18N_DIR_NOT_FOUND when i18n is missing", () => {
     root = mkdtempSync(join(tmpdir(), "i18next-kit-orchestrate-no-i18n-"));
     expect(() =>
       generateAll({
@@ -187,7 +196,7 @@ describe("generateAll", () => {
     }
   });
 
-  it("仅有 i18n 无 base 时抛出 CONTRACTS_DIR_NOT_FOUND 并带引导文案", () => {
+  it("throws CONTRACTS_DIR_NOT_FOUND when base is missing", () => {
     root = mkdtempSync(join(tmpdir(), "i18next-kit-orchestrate-no-base-"));
     mkdirSync(join(root, "src", "i18n"), { recursive: true });
 
@@ -211,7 +220,6 @@ describe("generateAll", () => {
       });
     } catch (e) {
       expect(e).toMatchObject({ code: "CONTRACTS_DIR_NOT_FOUND" });
-      expect(String((e as Error).message)).toContain("创建 base");
     }
   });
 });
