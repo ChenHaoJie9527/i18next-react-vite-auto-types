@@ -5,6 +5,7 @@ import {
   type I18nSourceWatchChange,
   watchI18nSources,
 } from "./watch-i18n-sources";
+import { createI18nWatchSignature } from "./watch-signature";
 import { syncLocales } from "@/core/sync-locales";
 import { resolveConfig } from "@/core/resolve-config";
 import { generateAll } from "@/core/orchestrate";
@@ -16,18 +17,50 @@ export function i18nextKit(options: I18nextKitPluginOptions): Plugin {
     name: "i18next-kit",
     configureServer() {
       const config = resolveConfig(options);
+      let activeSignature = createI18nWatchSignature(config);
 
       const scheduleGenerate = debounce(() => {
         runGenerate(options);
       }, 100);
-      const baseChangeHandler = createBaseChangeHandler(config);
+      let baseChangeHandler = createBaseChangeHandler(config);
+      /**
+       * 如果签名发生变化，则重新同步
+       * @returns - 是否重新同步
+       * @example
+       * ```ts
+       * const nextConfig = resolveConfig(options);
+       * const nextSignature = createI18nWatchSignature(nextConfig);
+       * if (nextSignature === activeSignature) {
+       *   return false;
+       * }
+       *
+       * baseChangeHandler.close();
+       * activeSignature = nextSignature;
+       * baseChangeHandler = createBaseChangeHandler(nextConfig);
+       * return true;
+       * ```
+       */
+      const resyncIfSignatureChanged = () => {
+        const nextConfig = resolveConfig(options);
+        const nextSignature = createI18nWatchSignature(nextConfig);
+        if (nextSignature === activeSignature) {
+          return false;
+        }
+
+        baseChangeHandler.close();
+        activeSignature = nextSignature;
+        baseChangeHandler = createBaseChangeHandler(nextConfig);
+        return true;
+      };
 
       const { watcher, stopWatch } = watchI18nSources(config, (change) => {
+        resyncIfSignatureChanged();
         baseChangeHandler.handle(change);
         scheduleGenerate();
       });
 
       watcher.on("ready", () => {
+        resyncIfSignatureChanged();
         scheduleGenerate();
       });
 

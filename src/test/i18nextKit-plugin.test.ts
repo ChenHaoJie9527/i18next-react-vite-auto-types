@@ -98,6 +98,42 @@ describe("i18nextKit plugin", () => {
     expect(console.error).not.toHaveBeenCalled();
   });
 
+  it("resyncs when the watch path signature changes before ready", () => {
+    const mutableOptions: I18nextKitConfig = {
+      ...options,
+      locales: ["en-US"],
+    };
+    configurePlugin(mutableOptions);
+    mutableOptions.locales = ["en-US", "zh-CN"];
+
+    watcherHandlers.get("ready")?.();
+    vi.advanceTimersByTime(100);
+
+    expect(generateAll).toHaveBeenCalledTimes(1);
+    expect(generateAll).toHaveBeenCalledWith(mutableOptions);
+  });
+
+  it("uses the refreshed config after a watch signature change", () => {
+    const mutableOptions: I18nextKitConfig = {
+      ...options,
+      locales: ["en-US"],
+    };
+    configurePlugin(mutableOptions);
+    mutableOptions.locales = ["en-US", "zh-CN"];
+
+    watchedChange?.({ type: "add", path: "base/common.ts" });
+
+    expect(syncLocales).toHaveBeenCalledWith(
+      expect.objectContaining({
+        locales: ["en-US", "zh-CN"],
+      }),
+      {
+        type: "add",
+        file: "D:\\project\\src\\i18n\\base\\common.ts",
+      }
+    );
+  });
+
   it("syncs added base files before debounced generation", () => {
     configurePlugin();
 
