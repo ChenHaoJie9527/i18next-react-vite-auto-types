@@ -26,6 +26,73 @@ export function inferLocaleDefaultValue(
   return result;
 }
 
+export function mergeLocaleDefaultValue(
+  inferred: LocaleDefaultValue,
+  existingSource: string
+): LocaleDefaultValue {
+  const existing = parseLocaleDefaultValue(existingSource);
+  const result: LocaleDefaultValue = {};
+
+  for (const key of Object.keys(inferred)) {
+    result[key] = existing[key] ?? inferred[key] ?? "";
+  }
+
+  return result;
+}
+
+export function parseLocaleDefaultValue(source: string): LocaleDefaultValue {
+  const body = findDefaultObjectBody(source);
+  if (!body) {
+    return {};
+  }
+
+  const result: LocaleDefaultValue = {};
+  const propertyPattern =
+    /(?:^|[,\n])\s*(?:"([^"]+)"|'([^']+)'|([A-Za-z_$][\w$-]*))\s*:\s*(?:"((?:\\.|[^"\\])*)"|'((?:\\.|[^'\\])*)')\s*(?:,|\n|$)/g;
+
+  for (const match of body.matchAll(propertyPattern)) {
+    const key = match[1] ?? match[2] ?? match[3];
+    const value = match[4] ?? match[5];
+    if (key && value !== undefined) {
+      result[key] = unescapeStringValue(value);
+    }
+  }
+
+  return result;
+}
+
+function findDefaultObjectBody(source: string) {
+  const defaultStart = source.indexOf("export default");
+  if (defaultStart < 0) {
+    return;
+  }
+
+  const open = source.indexOf("{", defaultStart);
+  if (open < 0) {
+    return;
+  }
+
+  let depth = 0;
+  for (let index = open; index < source.length; index += 1) {
+    const char = source[index];
+    if (char === "{") {
+      depth += 1;
+    }
+    if (char === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return source.slice(open + 1, index);
+      }
+    }
+  }
+
+  return;
+}
+
+function unescapeStringValue(value: string) {
+  return value.replaceAll('\\"', '"').replaceAll("\\'", "'");
+}
+
 /**
  * 查找类型字面量体
  * @param source - 源代码

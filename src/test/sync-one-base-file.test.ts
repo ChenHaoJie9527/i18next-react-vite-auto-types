@@ -88,6 +88,41 @@ export default {
 `);
   });
 
+  it("keeps existing locale values when base keys are synced again", () => {
+    const config = createConfig();
+    const baseFile = join(config.contractsDir, "base", "common.ts");
+    const localeFile = join(config.i18nDir, "en-US", "common.ts");
+    mkdirSync(dirname(baseFile), { recursive: true });
+    mkdirSync(dirname(localeFile), { recursive: true });
+    writeFileSync(
+      baseFile,
+      `export type CommonMessage = {
+  title: string;
+  copy: string;
+};`
+    );
+    writeFileSync(
+      localeFile,
+      `import type { CommonMessage } from "../base/common";
+
+export default {
+  "title": "Hello",
+  "copy": "Copy text",
+} satisfies CommonMessage;
+`
+    );
+
+    syncOneBaseFile(config, baseFile);
+
+    expect(readFileSync(localeFile, "utf-8")).toBe(`import type { CommonMessage } from "../base/common";
+
+export default {
+  "title": "Hello",
+  "copy": "Copy text",
+} satisfies CommonMessage;
+`);
+  });
+
   it("ignores non-ts base files", () => {
     const config = createConfig();
 

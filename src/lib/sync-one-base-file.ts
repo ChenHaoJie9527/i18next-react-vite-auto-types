@@ -4,7 +4,10 @@ import { writeIfChanged } from "@/core";
 import type { ResolvedConfig } from "@/core/types";
 import { createLocaleSource } from "./create-locale-source";
 import { getBaseFileMetadata } from "./get-base-file-metadata";
-import { inferLocaleDefaultValue } from "./infer-locale-default";
+import {
+  inferLocaleDefaultValue,
+  mergeLocaleDefaultValue,
+} from "./infer-locale-default";
 
 /**
  * 在新增或者修改时 同步对应的 locale 文件
@@ -33,15 +36,18 @@ export function syncOneBaseFile(
 
   const source = existsSync(baseFile) ? readFileSync(baseFile, "utf-8") : "";
   const defaultValue = inferLocaleDefaultValue(source, metadata.typeName);
-  const content = createLocaleSource(
-    metadata.namespace,
-    metadata.typeName,
-    defaultValue
-  );
   const writtenFiles: string[] = [];
 
   for (const locale of config.locales) {
     const target = join(config.i18nDir, locale, `${metadata.namespace}.ts`);
+    const existingSource = existsSync(target)
+      ? readFileSync(target, "utf-8")
+      : "";
+    const content = createLocaleSource(
+      metadata.namespace,
+      metadata.typeName,
+      mergeLocaleDefaultValue(defaultValue, existingSource)
+    );
     // 创建目录
     mkdirSync(dirname(target), {
       recursive: true,
