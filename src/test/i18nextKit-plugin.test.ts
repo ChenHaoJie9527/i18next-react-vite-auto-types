@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { generateAll } from "../core/orchestrate";
+import { syncLocales } from "../core/sync-locales";
 import type { I18nextKitConfig } from "../core/types";
 import { i18nextKit } from "../plugin";
 import { watchI18nSources } from "../plugin/watch-i18n-sources";
+import type { I18nSourceWatchChange } from "../plugin/watch-i18n-sources";
 
-type WatchCallback = (path: string) => void;
+type WatchCallback = (change: I18nSourceWatchChange) => void;
 type WatchHandler = (...args: unknown[]) => void;
 
 const watcherHandlers = new Map<string, WatchHandler>();
@@ -25,8 +27,12 @@ vi.mock("../plugin/watch-i18n-sources", () => ({
   }),
 }));
 
-vi.mock("../core/orchestrate", () => ({
+vi.mock("@/core/orchestrate", () => ({
   generateAll: vi.fn(),
+}));
+
+vi.mock("@/core/sync-locales", () => ({
+  syncLocales: vi.fn(),
 }));
 
 describe("i18nextKit plugin", () => {
@@ -44,6 +50,7 @@ describe("i18nextKit plugin", () => {
     stopWatch.mockClear();
     watchedChange = undefined;
     vi.mocked(generateAll).mockClear();
+    vi.mocked(syncLocales).mockClear();
     vi.mocked(watchI18nSources).mockClear();
   });
 
@@ -61,7 +68,7 @@ describe("i18nextKit plugin", () => {
     return configureServer({} as never) as (() => void) | undefined;
   }
 
-  it("在 Vite 服务器配置过程中注册 i18n 监听器", () => {
+  it("registers the i18n watcher during Vite server setup", () => {
     configurePlugin();
 
     expect(watchI18nSources).toHaveBeenCalledTimes(1);
@@ -75,7 +82,7 @@ describe("i18nextKit plugin", () => {
     expect(watcherHandlers.has("ready")).toBe(true);
   });
 
-  it("在 watcher 准备好后执行生成", () => {
+  it("runs generation after watcher ready is debounced", () => {
     configurePlugin();
 
     watcherHandlers.get("ready")?.();
@@ -86,22 +93,68 @@ describe("i18nextKit plugin", () => {
     expect(generateAll).toHaveBeenCalledWith(options);
   });
 
-  it("在 watched 源发生变化后执行生成", () => {
+  it("syncs added base files before debounced generation", () => {
     configurePlugin();
 
-    watchedChange?.("en-US/common.ts");
+    watchedChange?.({ type: "add", path: "base/common.ts" });
 
+    expect(syncLocales).toHaveBeenCalledTimes(1);
+    expect(syncLocales).toHaveBeenCalledWith(
+      expect.objectContaining({
+        contractsDir: "D:\\project\\src\\i18n\\base",
+      }),
+      {
+        type: "add",
+        file: "D:\\project\\src\\i18n\\base\\common.ts",
+      }
+    );
+    expect(generateAll).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(100);
+    expect(generateAll).toHaveBeenCalledTimes(1);
+  });
+
+  it("syncs changed and unlinked base files with matching event types", () => {
+    configurePlugin();
+
+    watchedChange?.({ type: "change", path: "base/common.ts" });
+    watchedChange?.({ type: "unlink", path: "base/user-management.ts" });
+
+    expect(syncLocales).toHaveBeenNthCalledWith(
+      1,
+      expect.any(Object),
+      {
+        type: "change",
+        file: "D:\\project\\src\\i18n\\base\\common.ts",
+      }
+    );
+    expect(syncLocales).toHaveBeenNthCalledWith(
+      2,
+      expect.any(Object),
+      {
+        type: "unlink",
+        file: "D:\\project\\src\\i18n\\base\\user-management.ts",
+      }
+    );
+  });
+
+  it("does not sync locale file changes back to base", () => {
+    configurePlugin();
+
+    watchedChange?.({ type: "change", path: "en-US/common.ts" });
+
+    expect(syncLocales).not.toHaveBeenCalled();
     vi.advanceTimersByTime(100);
     expect(generateAll).toHaveBeenCalledTimes(1);
     expect(generateAll).toHaveBeenCalledWith(options);
   });
 
-  it("将多个 watcher 通知合并为一个生成", () => {
+  it("debounces multiple watcher notifications into one generation", () => {
     configurePlugin();
 
-    watchedChange?.("en-US/common.ts");
+    watchedChange?.({ type: "change", path: "en-US/common.ts" });
     vi.advanceTimersByTime(50);
-    watchedChange?.("zh-CN/common.ts");
+    watchedChange?.({ type: "change", path: "zh-CN/common.ts" });
     vi.advanceTimersByTime(99);
 
     expect(generateAll).not.toHaveBeenCalled();
@@ -109,7 +162,7 @@ describe("i18nextKit plugin", () => {
     expect(generateAll).toHaveBeenCalledTimes(1);
   });
 
-  it("在 Vite 释放插件钩子时停止 watcher", () => {
+  it("stops the watcher when Vite disposes the plugin hook", () => {
     const cleanup = configurePlugin();
 
     cleanup?.();

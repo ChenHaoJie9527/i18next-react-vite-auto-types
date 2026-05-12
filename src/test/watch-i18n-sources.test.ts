@@ -44,7 +44,7 @@ describe("watchI18nSources", () => {
     mocks.handlers.clear();
   });
 
-  it("监听解析后的 i18n 目录，不触发初始事件", () => {
+  it("watches the resolved i18n directory without initial events", () => {
     watchI18nSources(config, vi.fn());
 
     expect(mocks.watch).toHaveBeenCalledWith(config.i18nDir, {
@@ -52,7 +52,7 @@ describe("watchI18nSources", () => {
     });
   });
 
-  it("注册 add, change, 和 unlink 处理器", () => {
+  it("registers add, change, and unlink handlers", () => {
     watchI18nSources(config, vi.fn());
 
     expect(mocks.handlers.has("add")).toBe(true);
@@ -60,7 +60,7 @@ describe("watchI18nSources", () => {
     expect(mocks.handlers.has("unlink")).toBe(true);
   });
 
-  it("传递相对于 i18n 目录的更改路径", () => {
+  it("passes changed paths relative to the i18n directory", () => {
     const onChange = vi.fn();
     watchI18nSources(config, onChange);
 
@@ -68,10 +68,32 @@ describe("watchI18nSources", () => {
       .get("change")
       ?.(join(config.i18nDir, "en-US", "common.ts"));
 
-    expect(onChange).toHaveBeenCalledWith(join("en-US", "common.ts"));
+    expect(onChange).toHaveBeenCalledWith({
+      type: "change",
+      path: join("en-US", "common.ts"),
+    });
   });
 
-  it("关闭底层的 watcher", () => {
+  it("passes add and unlink event types", () => {
+    const onChange = vi.fn();
+    watchI18nSources(config, onChange);
+
+    mocks.handlers.get("add")?.(join(config.i18nDir, "base", "common.ts"));
+    mocks.handlers
+      .get("unlink")
+      ?.(join(config.i18nDir, "base", "user-management.ts"));
+
+    expect(onChange).toHaveBeenNthCalledWith(1, {
+      type: "add",
+      path: join("base", "common.ts"),
+    });
+    expect(onChange).toHaveBeenNthCalledWith(2, {
+      type: "unlink",
+      path: join("base", "user-management.ts"),
+    });
+  });
+
+  it("closes the underlying watcher", () => {
     const { stopWatch } = watchI18nSources(config, vi.fn());
 
     stopWatch();
