@@ -52,15 +52,18 @@ describe("i18nextKit plugin", () => {
     vi.mocked(generateAll).mockClear();
     vi.mocked(syncLocales).mockClear();
     vi.mocked(watchI18nSources).mockClear();
+    vi.spyOn(console, "info").mockImplementation(() => undefined);
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
   });
 
   afterEach(() => {
     vi.runOnlyPendingTimers();
+    vi.restoreAllMocks();
     vi.useRealTimers();
   });
 
-  function configurePlugin() {
-    const plugin = i18nextKit(options);
+  function configurePlugin(pluginOptions: I18nextKitConfig = options) {
+    const plugin = i18nextKit(pluginOptions);
     const configureServer = plugin.configureServer;
     if (typeof configureServer !== "function") {
       throw new Error("configureServer is not registered");
@@ -91,6 +94,8 @@ describe("i18nextKit plugin", () => {
     vi.advanceTimersByTime(100);
     expect(generateAll).toHaveBeenCalledTimes(1);
     expect(generateAll).toHaveBeenCalledWith(options);
+    expect(console.info).not.toHaveBeenCalled();
+    expect(console.error).not.toHaveBeenCalled();
   });
 
   it("syncs added base files before debounced generation", () => {
@@ -162,6 +167,53 @@ describe("i18nextKit plugin", () => {
     expect(generateAll).not.toHaveBeenCalled();
     vi.advanceTimersByTime(1);
     expect(generateAll).toHaveBeenCalledTimes(1);
+  });
+
+  it("logs lightweight diagnostics only when diagnostics is info", () => {
+    vi.mocked(generateAll).mockReturnValueOnce({
+      writtenFiles: ["generated-resources.ts", "contracts.ts"],
+      validation: { ok: true, issues: [] },
+      durationMs: 12.3,
+    });
+    configurePlugin({ ...options, diagnostics: "info" });
+
+    watcherHandlers.get("ready")?.();
+    vi.advanceTimersByTime(100);
+
+    expect(console.info).toHaveBeenCalledWith(
+      "[i18next-kit] generated 2 file(s) in 12ms"
+    );
+    expect(console.error).not.toHaveBeenCalled();
+  });
+
+  it("keeps generation errors silent by default", () => {
+    vi.mocked(generateAll).mockImplementationOnce(() => {
+      throw new Error("broken i18n");
+    });
+    configurePlugin();
+
+    watcherHandlers.get("ready")?.();
+
+    expect(() => vi.advanceTimersByTime(100)).not.toThrow();
+    expect(console.info).not.toHaveBeenCalled();
+    expect(console.error).not.toHaveBeenCalled();
+  });
+
+  it("reports skipped generation with info diagnostics", () => {
+    const error = new Error("broken i18n");
+    vi.mocked(generateAll).mockImplementationOnce(() => {
+      throw error;
+    });
+    configurePlugin({ ...options, diagnostics: "info" });
+
+    watcherHandlers.get("ready")?.();
+    vi.advanceTimersByTime(100);
+
+    expect(console.info).toHaveBeenCalledWith(
+      "[i18next-kit] generation skipped",
+      error
+    );
+    expect(console.error).not.toHaveBeenCalled();
   });
 
   it("stops the watcher when Vite disposes the plugin hook", () => {

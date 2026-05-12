@@ -15,7 +15,7 @@ export function i18nextKit(options: I18nextKitPluginOptions): Plugin {
       const config = resolveConfig(options);
 
       const scheduleGenerate = debounce(() => {
-        generateAll(options);
+        runGenerate(options);
       }, 100);
 
       const { watcher, stopWatch } = watchI18nSources(config, (change) => {
@@ -35,6 +35,31 @@ export function i18nextKit(options: I18nextKitPluginOptions): Plugin {
       };
     },
   };
+}
+
+function resolveDiagnostics(options: I18nextKitPluginOptions) {
+  if (options.silent === true) {
+    return "none";
+  }
+
+  return options.diagnostics ?? "none";
+}
+
+function runGenerate(options: I18nextKitPluginOptions) {
+  const diagnostics = resolveDiagnostics(options);
+
+  try {
+    const result = generateAll(options);
+    if (diagnostics === "info") {
+      console.info(
+        `[i18next-kit] generated ${result.writtenFiles.length} file(s) in ${Math.round(result.durationMs)}ms`
+      );
+    }
+  } catch (error) {
+    if (diagnostics === "info") {
+      console.info("[i18next-kit] generation skipped", error);
+    }
+  }
 }
 
 /**
