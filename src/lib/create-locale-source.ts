@@ -6,10 +6,19 @@
  */
 export function createLocaleSource(
   namespace: string,
-  typeName: string
+  typeName: string,
+  defaultValue: Record<string, string> = {}
 ): string {
+  const entries = Object.entries(defaultValue);
+  const defaultSource =
+    entries.length === 0
+      ? "{}"
+      : `{
+${entries.map(([key, value]) => `  ${JSON.stringify(key)}: ${JSON.stringify(value)},`).join("\n")}
+}`;
+
   return `import type { ${typeName} } from "../base/${namespace}";
 
-export default {} satisfies ${typeName};
+export default ${defaultSource} satisfies ${typeName};
 `;
 }

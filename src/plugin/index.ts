@@ -1,10 +1,11 @@
 import { isAbsolute, join, relative } from "node:path";
-import type { Plugin } from "vite";
+import type { Plugin, ViteDevServer } from "vite";
 import type { I18nextKitConfig } from "../core/types";
 import {
   type I18nSourceWatchChange,
   watchI18nSources,
 } from "./watch-i18n-sources";
+import { createI18nWatchSignature } from "./watch-signature";
 import { syncLocales } from "@/core/sync-locales";
 import { resolveConfig } from "@/core/resolve-config";
 import { generateAll } from "@/core/orchestrate";
@@ -14,29 +15,67 @@ export type I18nextKitPluginOptions = I18nextKitConfig;
 export function i18nextKit(options: I18nextKitPluginOptions): Plugin {
   return {
     name: "i18next-kit",
-    configureServer() {
+    configureServer(server) {
       const config = resolveConfig(options);
+      let activeSignature = createI18nWatchSignature(config);
 
       const scheduleGenerate = debounce(() => {
         runGenerate(options);
       }, 100);
-      const baseChangeHandler = createBaseChangeHandler(config);
+      let baseChangeHandler = createBaseChangeHandler(config);
+      /**
+       * 如果签名发生变化，则重新同步
+       * @returns - 是否重新同步
+       * @example
+       * ```ts
+       * const nextConfig = resolveConfig(options);
+       * const nextSignature = createI18nWatchSignature(nextConfig);
+       * if (nextSignature === activeSignature) {
+       *   return false;
+       * }
+       *
+       * baseChangeHandler.close();
+       * activeSignature = nextSignature;
+       * baseChangeHandler = createBaseChangeHandler(nextConfig);
+       * return true;
+       * ```
+       */
+      const resyncIfSignatureChanged = () => {
+        const nextConfig = resolveConfig(options);
+        const nextSignature = createI18nWatchSignature(nextConfig);
+        if (nextSignature === activeSignature) {
+          return false;
+        }
+
+        baseChangeHandler.close();
+        activeSignature = nextSignature;
+        baseChangeHandler = createBaseChangeHandler(nextConfig);
+        return true;
+      };
 
       const { watcher, stopWatch } = watchI18nSources(config, (change) => {
+        resyncIfSignatureChanged();
         baseChangeHandler.handle(change);
         scheduleGenerate();
       });
 
       watcher.on("ready", () => {
+        resyncIfSignatureChanged();
         scheduleGenerate();
       });
 
-      return () => {
+      const cleanup = () => {
         baseChangeHandler.close();
         stopWatch();
       };
+
+      registerServerCleanup(server, cleanup);
     },
   };
+}
+
+function registerServerCleanup(server: ViteDevServer, cleanup: () => void) {
+  server.httpServer?.once("close", cleanup);
 }
 
 /**

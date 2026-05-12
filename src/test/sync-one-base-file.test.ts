@@ -1,6 +1,12 @@
-import { existsSync, readFileSync, rmSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { ResolvedConfig } from "../core/types";
 import { syncOneBaseFile } from "../lib/sync-one-base-file";
@@ -29,7 +35,7 @@ describe("syncOneBaseFile", () => {
     };
   }
 
-  it("在新增或者修改时 同步对应的 locale 文件", () => {
+  it("syncs a base file into each locale", () => {
     const config = createConfig();
     const baseFile = join(config.contractsDir, "base", "user-management.ts");
     const expectedFiles = [
@@ -50,7 +56,7 @@ export default {} satisfies UserManagementMessage;
     }
   });
 
-  it("内容未变化时不重复写入", () => {
+  it("does not rewrite unchanged locale files", () => {
     const config = createConfig();
     const baseFile = join(config.contractsDir, "base", "common.ts");
 
@@ -59,7 +65,65 @@ export default {} satisfies UserManagementMessage;
     expect(syncOneBaseFile(config, baseFile)).toEqual([]);
   });
 
-  it("非普通 ts 文件不生成 locale 文件", () => {
+  it("fills required string keys inferred from the base type", () => {
+    const config = createConfig();
+    const baseFile = join(config.contractsDir, "base", "common.ts");
+    mkdirSync(dirname(baseFile), { recursive: true });
+    writeFileSync(
+      baseFile,
+      `export type CommonMessage = {
+  title: string;
+};`
+    );
+
+    syncOneBaseFile(config, baseFile);
+
+    expect(
+      readFileSync(join(config.i18nDir, "en-US", "common.ts"), "utf-8")
+    ).toBe(`import type { CommonMessage } from "../base/common";
+
+export default {
+  "title": "",
+} satisfies CommonMessage;
+`);
+  });
+
+  it("keeps existing locale values when base keys are synced again", () => {
+    const config = createConfig();
+    const baseFile = join(config.contractsDir, "base", "common.ts");
+    const localeFile = join(config.i18nDir, "en-US", "common.ts");
+    mkdirSync(dirname(baseFile), { recursive: true });
+    mkdirSync(dirname(localeFile), { recursive: true });
+    writeFileSync(
+      baseFile,
+      `export type CommonMessage = {
+  title: string;
+  copy: string;
+};`
+    );
+    writeFileSync(
+      localeFile,
+      `import type { CommonMessage } from "../base/common";
+
+export default {
+  "title": "Hello",
+  "copy": "Copy text",
+} satisfies CommonMessage;
+`
+    );
+
+    syncOneBaseFile(config, baseFile);
+
+    expect(readFileSync(localeFile, "utf-8")).toBe(`import type { CommonMessage } from "../base/common";
+
+export default {
+  "title": "Hello",
+  "copy": "Copy text",
+} satisfies CommonMessage;
+`);
+  });
+
+  it("ignores non-ts base files", () => {
     const config = createConfig();
 
     const notValidFile = join(config.contractsDir, "base", "types.d.ts");

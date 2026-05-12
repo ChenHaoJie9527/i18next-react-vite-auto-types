@@ -11,6 +11,7 @@ type WatchHandler = (...args: unknown[]) => void;
 
 const watcherHandlers = new Map<string, WatchHandler>();
 const stopWatch = vi.fn();
+let closeHandler: (() => void) | undefined;
 let watchedChange: WatchCallback | undefined;
 
 vi.mock("../plugin/watch-i18n-sources", () => ({
@@ -48,6 +49,7 @@ describe("i18nextKit plugin", () => {
     vi.useFakeTimers();
     watcherHandlers.clear();
     stopWatch.mockClear();
+    closeHandler = undefined;
     watchedChange = undefined;
     vi.mocked(generateAll).mockClear();
     vi.mocked(syncLocales).mockClear();
@@ -68,7 +70,15 @@ describe("i18nextKit plugin", () => {
     if (typeof configureServer !== "function") {
       throw new Error("configureServer is not registered");
     }
-    return configureServer({} as never) as (() => void) | undefined;
+    configureServer({
+      httpServer: {
+        once: vi.fn((event: string, handler: () => void) => {
+          if (event === "close") {
+            closeHandler = handler;
+          }
+        }),
+      },
+    } as never);
   }
 
   it("registers the i18n watcher during Vite server setup", () => {
@@ -96,6 +106,42 @@ describe("i18nextKit plugin", () => {
     expect(generateAll).toHaveBeenCalledWith(options);
     expect(console.info).not.toHaveBeenCalled();
     expect(console.error).not.toHaveBeenCalled();
+  });
+
+  it("resyncs when the watch path signature changes before ready", () => {
+    const mutableOptions: I18nextKitConfig = {
+      ...options,
+      locales: ["en-US"],
+    };
+    configurePlugin(mutableOptions);
+    mutableOptions.locales = ["en-US", "zh-CN"];
+
+    watcherHandlers.get("ready")?.();
+    vi.advanceTimersByTime(100);
+
+    expect(generateAll).toHaveBeenCalledTimes(1);
+    expect(generateAll).toHaveBeenCalledWith(mutableOptions);
+  });
+
+  it("uses the refreshed config after a watch signature change", () => {
+    const mutableOptions: I18nextKitConfig = {
+      ...options,
+      locales: ["en-US"],
+    };
+    configurePlugin(mutableOptions);
+    mutableOptions.locales = ["en-US", "zh-CN"];
+
+    watchedChange?.({ type: "add", path: "base/common.ts" });
+
+    expect(syncLocales).toHaveBeenCalledWith(
+      expect.objectContaining({
+        locales: ["en-US", "zh-CN"],
+      }),
+      {
+        type: "add",
+        file: "D:\\project\\src\\i18n\\base\\common.ts",
+      }
+    );
   });
 
   it("syncs added base files before debounced generation", () => {
@@ -164,10 +210,10 @@ describe("i18nextKit plugin", () => {
   });
 
   it("does not sync pending base unlink after plugin cleanup", () => {
-    const cleanup = configurePlugin();
+    configurePlugin();
 
     watchedChange?.({ type: "unlink", path: "base/user.ts" });
-    cleanup?.();
+    closeHandler?.();
     vi.advanceTimersByTime(100);
 
     expect(syncLocales).not.toHaveBeenCalled();
@@ -248,9 +294,9 @@ describe("i18nextKit plugin", () => {
   });
 
   it("stops the watcher when Vite disposes the plugin hook", () => {
-    const cleanup = configurePlugin();
+    configurePlugin();
 
-    cleanup?.();
+    closeHandler?.();
 
     expect(stopWatch).toHaveBeenCalledTimes(1);
   });
