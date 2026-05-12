@@ -141,7 +141,9 @@ describe("i18nextKit plugin", () => {
   it("does not sync locale file changes back to base", () => {
     configurePlugin();
 
+    watchedChange?.({ type: "add", path: "en-US/new-page.ts" });
     watchedChange?.({ type: "change", path: "en-US/common.ts" });
+    watchedChange?.({ type: "unlink", path: "zh-CN/old-page.ts" });
 
     expect(syncLocales).not.toHaveBeenCalled();
     vi.advanceTimersByTime(100);
