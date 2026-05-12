@@ -2,6 +2,23 @@ import chokidar from "chokidar";
 import { relative } from "node:path";
 import type { ResolvedConfig } from "../core/types";
 
+/**
+ * 监听 i18n 目录下的所有文件
+ * @param config - 配置
+ * @param onChange - 变化回调
+ * @returns - 停止监听
+ * @example
+ * ```ts
+ * watchI18nSources({
+ *   i18nDir: "i18n",
+ *   locales: ["en", "zh"],
+ *   contractsDir: "contracts",
+ *   baseDir: "base",
+ * }, (path) => {
+ *   console.log(path);
+ * });
+ * ```
+ */
 export function watchI18nSources(
   config: ResolvedConfig,
   onChange: (path: string) => void
