@@ -133,6 +133,8 @@ describe("i18nextKit plugin", () => {
         file: "D:\\project\\src\\i18n\\base\\common.ts",
       }
     );
+    expect(syncLocales).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(100);
     expect(syncLocales).toHaveBeenNthCalledWith(
       2,
       expect.any(Object),
@@ -141,6 +143,35 @@ describe("i18nextKit plugin", () => {
         file: "D:\\project\\src\\i18n\\base\\user-management.ts",
       }
     );
+  });
+
+  it("combines base unlink and add events into a rename", () => {
+    configurePlugin();
+
+    watchedChange?.({ type: "unlink", path: "base/user.ts" });
+    vi.advanceTimersByTime(50);
+    watchedChange?.({ type: "add", path: "base/user-management.ts" });
+
+    expect(syncLocales).toHaveBeenCalledTimes(1);
+    expect(syncLocales).toHaveBeenCalledWith(
+      expect.any(Object),
+      {
+        type: "rename",
+        oldFile: "D:\\project\\src\\i18n\\base\\user.ts",
+        newFile: "D:\\project\\src\\i18n\\base\\user-management.ts",
+      }
+    );
+  });
+
+  it("does not sync pending base unlink after plugin cleanup", () => {
+    const cleanup = configurePlugin();
+
+    watchedChange?.({ type: "unlink", path: "base/user.ts" });
+    cleanup?.();
+    vi.advanceTimersByTime(100);
+
+    expect(syncLocales).not.toHaveBeenCalled();
+    expect(stopWatch).toHaveBeenCalledTimes(1);
   });
 
   it("does not sync locale file changes back to base", () => {

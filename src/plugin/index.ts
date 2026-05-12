@@ -1,7 +1,10 @@
 import { isAbsolute, join, relative } from "node:path";
 import type { Plugin } from "vite";
 import type { I18nextKitConfig } from "../core/types";
-import { watchI18nSources } from "./watch-i18n-sources";
+import {
+  type I18nSourceWatchChange,
+  watchI18nSources,
+} from "./watch-i18n-sources";
 import { syncLocales } from "@/core/sync-locales";
 import { resolveConfig } from "@/core/resolve-config";
 import { generateAll } from "@/core/orchestrate";
@@ -17,12 +20,10 @@ export function i18nextKit(options: I18nextKitPluginOptions): Plugin {
       const scheduleGenerate = debounce(() => {
         runGenerate(options);
       }, 100);
+      const baseChangeHandler = createBaseChangeHandler(config);
 
       const { watcher, stopWatch } = watchI18nSources(config, (change) => {
-        const baseFile = resolveBaseChangeFile(config, change.path);
-        if (baseFile) {
-          syncLocales(config, { type: change.type, file: baseFile });
-        }
+        baseChangeHandler.handle(change);
         scheduleGenerate();
       });
 
@@ -31,8 +32,82 @@ export function i18nextKit(options: I18nextKitPluginOptions): Plugin {
       });
 
       return () => {
+        baseChangeHandler.close();
         stopWatch();
       };
+    },
+  };
+}
+
+/**
+ * 创建基础文件更改处理器
+ * @param config
+ * @returns - 基础文件更改处理器
+ * @example
+ * ```ts
+ * createBaseChangeHandler({
+ *   i18nDir: "i18n",
+ *   contractsDir: "contracts",
+ * });
+ * ```
+ */
+function createBaseChangeHandler(config: ReturnType<typeof resolveConfig>) {
+  let pendingUnlink:
+    | {
+        file: string;
+        timer: NodeJS.Timeout;
+      }
+    | undefined;
+
+  /**
+   * 刷新 pending 的 unlink 操作
+   */
+  const flushPendingUnlink = () => {
+    if (!pendingUnlink) {
+      return;
+    }
+
+    const { file, timer } = pendingUnlink;
+    clearTimeout(timer);
+    pendingUnlink = undefined;
+    syncLocales(config, { type: "unlink", file });
+  };
+
+  return {
+    close() {
+      if (pendingUnlink) {
+        clearTimeout(pendingUnlink.timer);
+        pendingUnlink = undefined;
+      }
+    },
+    handle(change: I18nSourceWatchChange) {
+      const baseFile = resolveBaseChangeFile(config, change.path);
+      if (!baseFile) {
+        return;
+      }
+
+      if (change.type === "unlink") {
+        flushPendingUnlink();
+        pendingUnlink = {
+          file: baseFile,
+          timer: setTimeout(() => {
+            pendingUnlink = undefined;
+            syncLocales(config, { type: "unlink", file: baseFile });
+          }, 100),
+        };
+        return;
+      }
+
+      if (change.type === "add" && pendingUnlink) {
+        const { file: oldFile, timer } = pendingUnlink;
+        clearTimeout(timer);
+        pendingUnlink = undefined;
+        syncLocales(config, { type: "rename", oldFile, newFile: baseFile });
+        return;
+      }
+
+      flushPendingUnlink();
+      syncLocales(config, { type: change.type, file: baseFile });
     },
   };
 }
