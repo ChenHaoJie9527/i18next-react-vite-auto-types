@@ -1,5 +1,5 @@
 import { isAbsolute, join, relative } from "node:path";
-import type { Plugin } from "vite";
+import type { Plugin, ViteDevServer } from "vite";
 import type { I18nextKitConfig } from "../core/types";
 import {
   type I18nSourceWatchChange,
@@ -15,7 +15,7 @@ export type I18nextKitPluginOptions = I18nextKitConfig;
 export function i18nextKit(options: I18nextKitPluginOptions): Plugin {
   return {
     name: "i18next-kit",
-    configureServer() {
+    configureServer(server) {
       const config = resolveConfig(options);
       let activeSignature = createI18nWatchSignature(config);
 
@@ -64,12 +64,18 @@ export function i18nextKit(options: I18nextKitPluginOptions): Plugin {
         scheduleGenerate();
       });
 
-      return () => {
+      const cleanup = () => {
         baseChangeHandler.close();
         stopWatch();
       };
+
+      registerServerCleanup(server, cleanup);
     },
   };
+}
+
+function registerServerCleanup(server: ViteDevServer, cleanup: () => void) {
+  server.httpServer?.once("close", cleanup);
 }
 
 /**

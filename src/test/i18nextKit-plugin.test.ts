@@ -11,6 +11,7 @@ type WatchHandler = (...args: unknown[]) => void;
 
 const watcherHandlers = new Map<string, WatchHandler>();
 const stopWatch = vi.fn();
+let closeHandler: (() => void) | undefined;
 let watchedChange: WatchCallback | undefined;
 
 vi.mock("../plugin/watch-i18n-sources", () => ({
@@ -48,6 +49,7 @@ describe("i18nextKit plugin", () => {
     vi.useFakeTimers();
     watcherHandlers.clear();
     stopWatch.mockClear();
+    closeHandler = undefined;
     watchedChange = undefined;
     vi.mocked(generateAll).mockClear();
     vi.mocked(syncLocales).mockClear();
@@ -68,7 +70,15 @@ describe("i18nextKit plugin", () => {
     if (typeof configureServer !== "function") {
       throw new Error("configureServer is not registered");
     }
-    return configureServer({} as never) as (() => void) | undefined;
+    configureServer({
+      httpServer: {
+        once: vi.fn((event: string, handler: () => void) => {
+          if (event === "close") {
+            closeHandler = handler;
+          }
+        }),
+      },
+    } as never);
   }
 
   it("registers the i18n watcher during Vite server setup", () => {
@@ -200,10 +210,10 @@ describe("i18nextKit plugin", () => {
   });
 
   it("does not sync pending base unlink after plugin cleanup", () => {
-    const cleanup = configurePlugin();
+    configurePlugin();
 
     watchedChange?.({ type: "unlink", path: "base/user.ts" });
-    cleanup?.();
+    closeHandler?.();
     vi.advanceTimersByTime(100);
 
     expect(syncLocales).not.toHaveBeenCalled();
@@ -284,9 +294,9 @@ describe("i18nextKit plugin", () => {
   });
 
   it("stops the watcher when Vite disposes the plugin hook", () => {
-    const cleanup = configurePlugin();
+    configurePlugin();
 
-    cleanup?.();
+    closeHandler?.();
 
     expect(stopWatch).toHaveBeenCalledTimes(1);
   });

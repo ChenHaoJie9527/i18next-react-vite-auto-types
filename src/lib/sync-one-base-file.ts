@@ -1,9 +1,10 @@
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { writeIfChanged } from "@/core";
 import type { ResolvedConfig } from "@/core/types";
 import { createLocaleSource } from "./create-locale-source";
 import { getBaseFileMetadata } from "./get-base-file-metadata";
+import { inferLocaleDefaultValue } from "./infer-locale-default";
 
 /**
  * 在新增或者修改时 同步对应的 locale 文件
@@ -30,7 +31,13 @@ export function syncOneBaseFile(
     return;
   }
 
-  const content = createLocaleSource(metadata.namespace, metadata.typeName);
+  const source = existsSync(baseFile) ? readFileSync(baseFile, "utf-8") : "";
+  const defaultValue = inferLocaleDefaultValue(source, metadata.typeName);
+  const content = createLocaleSource(
+    metadata.namespace,
+    metadata.typeName,
+    defaultValue
+  );
   const writtenFiles: string[] = [];
 
   for (const locale of config.locales) {
