@@ -8,8 +8,9 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { syncAllBaseFiles, syncLocales } from "../core/sync-locales";
+import { syncLocales } from "../core/sync-locales";
 import type { ResolvedConfig } from "../core/types";
+import { syncAllBaseFiles } from "../lib/sync-all-base-files";
 
 describe("syncLocales", () => {
   let root: string | undefined;
@@ -34,11 +35,12 @@ describe("syncLocales", () => {
       root,
     };
   }
-  it("新增时 同步对应的 locale 文件", () => {
+
+  it("syncs an added base file into each locale", () => {
     const config = createConfig();
     const baseFile = join(config.contractsDir, "base", "user-management.ts");
     const result = syncLocales(config, { type: "add", file: baseFile });
-    expect(result.writtenFiles).toHaveLength(2);
+
     expect(result).toEqual({
       writtenFiles: [
         join(config.i18nDir, "en-US", "user-management.ts"),
@@ -48,7 +50,8 @@ describe("syncLocales", () => {
       renamedFiles: [],
     });
   });
-  it("修改时 同步对应的 locale 文件", () => {
+
+  it("syncs a changed base file into each locale", () => {
     const config = createConfig();
     const baseFile = join(config.contractsDir, "base", "user-management.ts");
     const expectedFiles = [
@@ -60,13 +63,13 @@ describe("syncLocales", () => {
 export default {} satisfies UserManagementMessage;
 `;
     mkdirSync(dirname(baseFile), { recursive: true });
-
     writeFileSync(baseFile, expectedContent);
+
     const result = syncLocales(config, {
       type: "change",
       file: baseFile,
     });
-    expect(result.writtenFiles).toHaveLength(2);
+
     expect(result).toEqual({
       writtenFiles: expectedFiles,
       deletedFiles: [],
@@ -77,7 +80,8 @@ export default {} satisfies UserManagementMessage;
       expect(readFileSync(file, "utf-8")).toBe(expectedContent);
     }
   });
-  it("删除时 删除对应的 locale 文件", () => {
+
+  it("deletes locale files when the base file is unlinked", () => {
     const config = createConfig();
     const baseFile = join(config.contractsDir, "base", "user-management.ts");
     const expectedFiles = [
@@ -102,7 +106,7 @@ export default {} satisfies UserManagementMessage;
     }
   });
 
-  it("重命名时 同步对应的 locale 文件", () => {
+  it("renames matching locale files when the base file is renamed", () => {
     const config = createConfig();
     const oldFile = join(config.contractsDir, "base", "user.ts");
     const newFile = join(config.contractsDir, "base", "user-management.ts");
@@ -112,15 +116,13 @@ export default {} satisfies UserManagementMessage;
       to: join(config.i18nDir, locale, "user-management.ts"),
     }));
 
-    // 创建旧文件
     for (const { from } of expectedRenamedFiles) {
       mkdirSync(dirname(from), { recursive: true });
       writeFileSync(from, "export default {};");
     }
 
-    // 将 base 目录下的 user.ts 重命名为 user-management.ts
     const result = syncLocales(config, { type: "rename", oldFile, newFile });
-    console.log("result =>", result);
+
     expect(result).toEqual({
       writtenFiles: [],
       deletedFiles: [],
@@ -132,7 +134,7 @@ export default {} satisfies UserManagementMessage;
     }
   });
 
-  it("全量同步 base 目录下的所有文件", () => {
+  it("syncs every base file into each locale", () => {
     const config = createConfig();
     const baseFiles = [
       join(config.contractsDir, "common.ts"),

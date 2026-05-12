@@ -32,10 +32,19 @@ export class I18nextKitError extends Error {
 }
 
 export type I18nextKitMode = "folder" | "file";
+export type I18nextKitDiagnostics = "none" | "info";
 
 type SharedConfig = {
   locales: readonly string[];
   mode: I18nextKitMode;
+  /**
+   * Vite 插件的开发时诊断功能。MVP 版本默认设置为“none”。
+   */
+  diagnostics?: I18nextKitDiagnostics;
+  /**
+   * 向后兼容的简写，用于禁用开发时诊断。
+   */
+  silent?: boolean;
   /**
    * 为 true（默认）时在生成前按需写入最小 i18n 模板；单测或显式校验宿主目录时可设为 false。
    */
