@@ -157,21 +157,31 @@ function resolveEffectiveI18nAbs(resolved: ResolvedConfig): {
 const BASE_COMMON = `/**
  * i18next-kit 脚手架：契约命名空间 common（可随意增删 key）
  */
+import type { I18nRich, I18nText } from "i18next-kit";
+
 export type CommonMessage = {
-  hello: string;
+  title: I18nText;
+  greeting: I18nText<{ name: string }>;
+  richTitle: I18nRich<{ name: string }, { strong: unknown }>;
 };
 `;
 
 function localeCommonSource(locale: string): string {
-  let hello = "Hello";
+  let title = "Hello";
+  let greeting = "Hello {{name}}";
+  let richTitle = "Hello <strong>{{name}}</strong>";
   if (locale === "zh-CN" || locale.startsWith("zh")) {
-    hello = "你好";
+    title = "你好";
+    greeting = "你好 {{name}}";
+    richTitle = "你好 <strong>{{name}}</strong>";
   }
 
   return `import type { CommonMessage } from "../base/common";
 
 export default {
-  hello: ${JSON.stringify(hello)},
+  title: ${JSON.stringify(title)},
+  greeting: ${JSON.stringify(greeting)},
+  richTitle: ${JSON.stringify(richTitle)},
 } satisfies CommonMessage;
 `;
 }
