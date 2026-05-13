@@ -88,6 +88,35 @@ export default {
 `);
   });
 
+  it("fills typed text and rich message placeholders inferred from the base type", () => {
+    const config = createConfig();
+    const baseFile = join(config.contractsDir, "base", "common.ts");
+    mkdirSync(dirname(baseFile), { recursive: true });
+    writeFileSync(
+      baseFile,
+      `import type { I18nRich, I18nText } from "i18next-kit";
+
+export type CommonMessage = {
+  title: I18nText;
+  greeting: I18nText<{ name: string }>;
+  richTitle: I18nRich<{ name: string }, { strong: unknown }>;
+};`
+    );
+
+    syncOneBaseFile(config, baseFile);
+
+    expect(
+      readFileSync(join(config.i18nDir, "en-US", "common.ts"), "utf-8")
+    ).toBe(`import type { CommonMessage } from "../base/common";
+
+export default {
+  "title": "",
+  "greeting": "{{name}}",
+  "richTitle": "<strong>{{name}}</strong>",
+} satisfies CommonMessage;
+`);
+  });
+
   it("keeps existing locale values when base keys are synced again", () => {
     const config = createConfig();
     const baseFile = join(config.contractsDir, "base", "common.ts");
@@ -114,7 +143,9 @@ export default {
 
     syncOneBaseFile(config, baseFile);
 
-    expect(readFileSync(localeFile, "utf-8")).toBe(`import type { CommonMessage } from "../base/common";
+    expect(
+      readFileSync(localeFile, "utf-8")
+    ).toBe(`import type { CommonMessage } from "../base/common";
 
 export default {
   "title": "Hello",

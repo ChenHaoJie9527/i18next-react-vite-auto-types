@@ -21,6 +21,25 @@ describe("inferLocaleDefaultValue", () => {
     });
   });
 
+  it("infers typed text and rich message defaults from base contracts", () => {
+    expect(
+      inferLocaleDefaultValue(
+        `import type { I18nRich, I18nText } from "i18next-kit";
+
+export type CommonMessage = {
+  title: I18nText;
+  greeting: I18nText<{ name: string }>;
+  richTitle: I18nRich<{ name: string }, { strong: unknown; link: unknown }>;
+};`,
+        "CommonMessage"
+      )
+    ).toEqual({
+      greeting: "{{name}}",
+      richTitle: "<strong>{{name}}</strong><link></link>",
+      title: "",
+    });
+  });
+
   it("returns an empty object for unsupported shapes", () => {
     expect(
       inferLocaleDefaultValue(
